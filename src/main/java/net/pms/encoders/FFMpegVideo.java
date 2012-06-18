@@ -328,12 +328,19 @@ public class FFMpegVideo extends Player {
 			fileName = ProcessUtil.getShortFileNameIfWideChars(fileName);
 		}
 
-		String movieLine       = "DirectShowSource(\"" + fileName + "\"" + convertfps + ")";
+		String movieLine       = "";
 		String mtLine1         = "";
 		String mtLine2         = "";
 		String mtLine3         = "";
 		String interframeLines = null;
 		String interframePath  = PMS.getConfiguration().getInterFramePath();
+		String avisynthDLLPath = PMS.getConfiguration().getAviSynthDLLPath();
+
+		if (PMS.getConfiguration().isAvisynthDSS2()) {
+			movieLine = "LoadPlugin(\"" + avisynthDLLPath + "avss.dll\")\nDSS2(\"" + fileName + "\"" + convertfps + ")";
+		} else {
+			movieLine = "DirectShowSource(\"" + fileName + "\"" + convertfps + ")";
+		}
 
 		int Cores = 1;
 		if (PMS.getConfiguration().getAvisynthMultiThreading()) {

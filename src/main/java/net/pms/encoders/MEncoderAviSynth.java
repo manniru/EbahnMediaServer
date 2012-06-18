@@ -43,12 +43,13 @@ public class MEncoderAviSynth extends MEncoderVideo {
 	private JCheckBox interframe;
 	private JCheckBox interframegpu;
 	private JCheckBox multithreading;
+	private JCheckBox dss2;
 
 	@Override
 	public JComponent config() {
 		FormLayout layout = new FormLayout(
 			"left:pref, 0:grow",
-			"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu,  0:grow"
+			"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu,  0:grow"
 		);
 		PanelBuilder builder = new PanelBuilder(layout);
 		builder.setBorder(Borders.EMPTY_BORDER);
@@ -117,6 +118,18 @@ public class MEncoderAviSynth extends MEncoderVideo {
 		});
 		builder.add(convertfps, cc.xy(2, 9));
 
+		dss2 = new JCheckBox(Messages.getString("MEncoderAviSynth.17"));
+		dss2.setContentAreaFilled(false);
+		if (PMS.getConfiguration().isAvisynthDSS2()) {
+			dss2.setSelected(true);
+		}
+		dss2.addItemListener(new ItemListener() {
+			public void itemStateChanged(ItemEvent e) {
+				PMS.getConfiguration().setAvisynthDSS2((e.getStateChange() == ItemEvent.SELECTED));
+			}
+		});
+		builder.add(dss2, cc.xy(2, 11));
+
 		String aviSynthScriptInstructions = Messages.getString("MEncoderAviSynth.4") +
 			Messages.getString("MEncoderAviSynth.5") +
 			Messages.getString("MEncoderAviSynth.6") +
@@ -126,7 +139,7 @@ public class MEncoderAviSynth extends MEncoderVideo {
 		aviSynthScriptInstructionsContainer.setEditable(false);
 		aviSynthScriptInstructionsContainer.setBorder(BorderFactory.createEtchedBorder());
 		aviSynthScriptInstructionsContainer.setBackground(new Color(255, 255, 192));
-		builder.add(aviSynthScriptInstructionsContainer, cc.xy(2, 11));
+		builder.add(aviSynthScriptInstructionsContainer, cc.xy(2, 13));
 
 		String clip = PMS.getConfiguration().getAvisynthScript();
 		if (clip == null) {
@@ -170,7 +183,7 @@ public class MEncoderAviSynth extends MEncoderVideo {
 
 		JScrollPane pane = new JScrollPane(textArea, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		pane.setPreferredSize(new Dimension(500, 350));
-		builder.add(pane, cc.xy(2, 13));
+		builder.add(pane, cc.xy(2, 15));
 
 		return builder.getPanel();
 	}

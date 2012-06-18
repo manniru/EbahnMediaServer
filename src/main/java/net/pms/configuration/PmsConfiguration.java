@@ -73,6 +73,7 @@ public class PmsConfiguration {
 	private static final String KEY_AVISYNTH_INTERFRAME = "avisynth_interframe";
 	private static final String KEY_AVISYNTH_INTERFRAME_GPU = "avisynth_interframegpu";
 	private static final String KEY_AVISYNTH_MULTITHREADING = "avisynth_multithreading";
+	private static final String KEY_AVISYNTH_DSS2 = "avisynth_dss2";
 	private static final String KEY_AVISYNTH_SCRIPT = "avisynth_script";
 	private static final String KEY_BUFFER_TYPE = "buffertype";
 	private static final String KEY_CHAPTER_INTERVAL = "chapter_interval";
@@ -1604,6 +1605,14 @@ public class PmsConfiguration {
 
 	public boolean getAvisynthMultiThreading() {
 		return getBoolean(KEY_AVISYNTH_MULTITHREADING, false);
+	}
+
+	public void setAvisynthDSS2(boolean value) {
+		configuration.setProperty(KEY_AVISYNTH_DSS2, value);
+	}
+
+	public boolean isAvisynthDSS2() {
+		return getBoolean(KEY_AVISYNTH_DSS2, true);
 	}
 
 	/**
