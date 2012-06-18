@@ -486,6 +486,11 @@ public class PmsConfiguration {
 		return programPaths.getInterFramePath();
 	}
 
+
+	public String getAviSynthDLLPath() {
+		return programPaths.getAviSynthDLLPath();
+	}
+
 	/**
 	 * If the framerate is not recognized correctly and the video runs too fast or too
 	 * slow, tsMuxeR can be forced to parse the fps from FFmpeg. Default value is true.

@@ -57,6 +57,11 @@ class LinuxDefaultPaths implements ProgramPaths {
 		return null;
 	}
 
+	@Override
+	public String getAviSynthDLLPath() {
+		return null;
+	}
+
 	/**
 	 * Returns the path where binaries can be found. This path differs between
 	 * the build phase and the test phase. The path will end with a slash unless

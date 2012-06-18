@@ -74,4 +74,9 @@ class WindowsRegistryProgramPaths implements ProgramPaths {
 	public String getInterFramePath() {
 		return defaults.getInterFramePath();
 	}
+
+	@Override
+	public String getAviSynthDLLPath() {
+		return defaults.getAviSynthDLLPath();
+	}
 }

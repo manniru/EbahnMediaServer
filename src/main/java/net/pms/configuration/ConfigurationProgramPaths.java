@@ -77,4 +77,9 @@ class ConfigurationProgramPaths implements ProgramPaths {
 	public String getInterFramePath() {
 		return stringFromConfigFile(KEY_INTERFRAME_PATH, defaults.getInterFramePath());
 	}
+
+	@Override
+	public String getAviSynthDLLPath() {
+		return stringFromConfigFile(KEY_AVISYNTHDLL_PATH, defaults.getAviSynthDLLPath());
+	}
 }

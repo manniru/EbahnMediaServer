@@ -79,4 +79,9 @@ class ProgramPathDisabler implements ProgramPaths {
 	public String getInterFramePath() {
 		return disableInterFrame ? null : ifEnabled.getInterFramePath();
 	}
+
+	@Override
+	public String getAviSynthDLLPath() {
+		return disableAviSynthDLL ? null : ifEnabled.getAviSynthDLLPath();
+	}
 }

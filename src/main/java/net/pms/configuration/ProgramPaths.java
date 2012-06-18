@@ -11,4 +11,5 @@ interface ProgramPaths {
 	String getDCRaw();
 	String getIMConvertPath();
 	String getInterFramePath();
+	String getAviSynthDLLPath();
 }

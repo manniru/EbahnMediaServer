@@ -2182,7 +2182,7 @@ public class MEncoderVideo extends Player {
 			rate = "44100";
 		}
 
-		// force srate -> cause ac3's mencoder doesn't like anything other than 48khz
+		// Force srate because MEncoder doesn't like AC3 using anything other than 48khz
 		if (media != null && !pcm && !dts && !mux) {
 			cmdArray = Arrays.copyOf(cmdArray, cmdArray.length + 4);
 			cmdArray[cmdArray.length - 6] = "-af";

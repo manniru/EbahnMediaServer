@@ -58,6 +58,11 @@ class WindowsDefaultPaths implements ProgramPaths {
 		return getBinariesPathAbsolute() + "win32/interframe/";
 	}
 
+	@Override
+	public String getAviSynthDLLPath() {
+		return getBinariesPathAbsolute() + "win32/avisynth/";
+	}
+
 	/**
 	 * Returns the relative path where binaries can be found. This path differs between
 	 * the build phase and the test phase. The path will end with a slash unless
