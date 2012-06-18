@@ -1067,15 +1067,27 @@ public class MEncoderVideo extends Player {
 	}
 
 	protected String[] getDefaultArgs() {
-		return new String[]{
-			"-quiet",
-			"-oac", oaccopy ? "copy" : (pcm ? "pcm" : "lavc"),
-			"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dts || mux) ? "rawvideo" : "mpeg")),
-			(wmv || mpegts) ? "-lavfopts" : "-quiet",
-			wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
-			"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
-			"-ovc", (mux || ovccopy) ? "copy" : "lavc"
-		};
+		if (avisynth() && configuration.isAvisynthDSS2()) {
+			return new String[]{
+				"-quiet",
+				"-nosound",
+				"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dts || mux) ? "rawvideo" : "mpeg")),
+				(wmv || mpegts) ? "-lavfopts" : "-quiet",
+				wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
+				"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
+				"-ovc", (mux || ovccopy) ? "copy" : "lavc"
+			};
+		} else {
+			return new String[]{
+				"-quiet",
+				"-oac", oaccopy ? "copy" : (pcm ? "pcm" : "lavc"),
+				"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dts || mux) ? "rawvideo" : "mpeg")),
+				(wmv || mpegts) ? "-lavfopts" : "-quiet",
+				wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
+				"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
+				"-ovc", (mux || ovccopy) ? "copy" : "lavc"
+			};
+		}
 	}
 
 	private String[] sanitizeArgs(String[] args) {
@@ -1279,7 +1291,10 @@ public class MEncoderVideo extends Player {
 			!forceMencoder &&
 			params.sid == null &&
 			!dvd &&
-			!avisynth() &&
+			!(
+				avisynth() &&
+				!configuration.isAvisynthDSS2()
+			) &&
 			media != null && (
 				media.isVideoPS3Compatible(newInput) ||
 				!params.mediaRenderer.isH264Level41Limited()
@@ -1364,9 +1379,18 @@ public class MEncoderVideo extends Player {
 		oaccopy = false;
 
 		// Disable AC3 remux for stereo tracks with 384 kbits bitrate and PS3 renderer (PS3 FW bug?)
-		boolean ps3_and_stereo_and_384_kbits = (params.mediaRenderer.getRendererName().equalsIgnoreCase("Playstation 3") && params.aid.getNrAudioChannels() == 2) && (params.aid.getBitRate() > 370000 && params.aid.getBitRate() < 400000);
+		boolean ps3_and_stereo_and_384_kbits = params.aid != null && (params.mediaRenderer.getRendererName().equalsIgnoreCase("Playstation 3") && params.aid.getNrAudioChannels() == 2) && (params.aid.getBitRate() > 370000 && params.aid.getBitRate() < 400000);
 
-		if (configuration.isRemuxAC3() && params.aid != null && params.aid.isAC3() && !ps3_and_stereo_and_384_kbits && !avisynth() && params.mediaRenderer.isTranscodeToAC3()) {
+		if (
+			configuration.isRemuxAC3() &&
+			params.aid != null
+			&& params.aid.isAC3() &&
+			!ps3_and_stereo_and_384_kbits &&
+			!(
+				avisynth() &&
+				!configuration.isAvisynthDSS2()
+			) &&
+			params.mediaRenderer.isTranscodeToAC3()) {
 			// AC3 remux takes priority
 			oaccopy = true;
 		} else {
@@ -1377,7 +1401,10 @@ public class MEncoderVideo extends Player {
 					configuration.isMencoderRemuxMPEG2()
 				) && params.aid != null &&
 				params.aid.isDTS() &&
-				!avisynth() &&
+				!(
+					avisynth() &&
+					!configuration.isAvisynthDSS2()
+				) &&
 				params.mediaRenderer.isDTSPlayable();
 			pcm = configuration.isMencoderUsePcm() &&
 				(
@@ -1421,7 +1448,7 @@ public class MEncoderVideo extends Player {
 			ovccopy = false;
 		}
 
-		if (pcm && avisynth()) {
+		if (pcm && avisynth() && !configuration.isAvisynthDSS2()) {
 			params.avidemux = true;
 		}
 
@@ -1551,6 +1578,7 @@ public class MEncoderVideo extends Player {
 		}
 
 		StringBuilder sb = new StringBuilder();
+
 		// Set subtitles options
 		if (!configuration.isMencoderDisableSubs() && !avisynth() && params.sid != null) {
 			int subtitleMargin = 0;
@@ -1762,7 +1790,16 @@ public class MEncoderVideo extends Player {
 		cmdArray[cmdArray.length - 10] = "-quiet";
 		cmdArray[cmdArray.length - 9] = "-quiet";
 
-		if (!dts && !pcm && !avisynth() && params.aid != null && media.getAudioCodes().size() > 1) {
+		if (
+			!dts &&
+			!pcm &&
+			!(
+				avisynth() &&
+				!configuration.isAvisynthDSS2()
+			) &&
+			params.aid != null &&
+			media.getAudioCodes().size() > 1
+		) {
 			cmdArray[cmdArray.length - 12] = "-aid";
 			boolean lavf = false; // Need to add support for LAVF demuxing
 			cmdArray[cmdArray.length - 11] = "" + (lavf ? params.aid.getId() + 1 : params.aid.getId());
@@ -1818,10 +1855,13 @@ public class MEncoderVideo extends Player {
 		if (avisynth() && configuration.getAvisynthInterFrame() && !"60000/1001".equals(frameRate) && !"50".equals(frameRate) && !"60".equals(frameRate)) {
 			if ("25".equals(frameRate)) {
 				cmdArray[cmdArray.length - 5] = "50";
+				params.forceFps = "50";
 			} else if ("30".equals(frameRate)) {
 				cmdArray[cmdArray.length - 5] = "60";
+				params.forceFps = "60";
 			} else {
 				cmdArray[cmdArray.length - 5] = "60000/1001";
+				params.forceFps = "59.94";
 			}
 		}
 
@@ -1871,7 +1911,16 @@ public class MEncoderVideo extends Player {
 			|| (configuration.isMencoderScaler() && (configuration.getMencoderScaleX() != 0 || configuration.getMencoderScaleY() != 0))
 			|| (intOCW > 0 || intOCH > 0);
 
-		if ((deinterlace || scaleBool) && !avisynth()) {
+		if (
+			(
+				deinterlace ||
+				scaleBool
+			) &&
+			!(
+				avisynth() &&
+				!configuration.isAvisynthDSS2()
+			)
+		) {
 			StringBuilder vfValueOverscanPrepend = new StringBuilder();
 			StringBuilder vfValueOverscanMiddle  = new StringBuilder();
 			StringBuilder vfValueVS              = new StringBuilder();
@@ -2250,9 +2299,8 @@ public class MEncoderVideo extends Player {
 				}
 				videoPipe.deleteLater();
 				audioPipe.deleteLater();
-			} else {
-				// remove the -oac switch, otherwise too many video packets errors appears again
-
+			} else if (!(avisynth() && configuration.isAvisynthDSS2())) {
+				// Remove the -oac switch to prevent video packet errors appearing
 				for (int s = 0; s < cmdArray.length; s++) {
 					if (cmdArray[s].equals("-oac")) {
 						cmdArray[s] = "-nosound";
@@ -2260,144 +2308,143 @@ public class MEncoderVideo extends Player {
 						break;
 					}
 				}
-
-				pipe = new PipeProcess(System.currentTimeMillis() + "tsmuxerout.ts");
-
-				TSMuxerVideo ts = new TSMuxerVideo(configuration);
-				File f = new File(configuration.getTempFolder(), "pms-tsmuxer.meta");
-				String cmd[] = new String[]{ts.executable(), f.getAbsolutePath(), pipe.getInputPipe()};
-				pw = new ProcessWrapperImpl(cmd, params);
-
-				PipeIPCProcess ffVideoPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegvideo", System.currentTimeMillis() + "videoout", false, true);
-
-				cmdArray[cmdArray.length - 1] = ffVideoPipe.getInputPipe();
-
-				OutputParams ffparams = new OutputParams(configuration);
-				ffparams.maxBufferSize = 1;
-				ffparams.stdin = params.stdin;
-				ProcessWrapperImpl ffVideo = new ProcessWrapperImpl(cmdArray, ffparams);
-
-				ProcessWrapper ff_video_pipe_process = ffVideoPipe.getPipeProcess();
-				pw.attachProcess(ff_video_pipe_process);
-				ff_video_pipe_process.runInNewThread();
-				ffVideoPipe.deleteLater();
-
-				pw.attachProcess(ffVideo);
-				ffVideo.runInNewThread();
-
-				String aid = null;
-				if (media != null && media.getAudioCodes().size() > 1 && params.aid != null) {
-					aid = params.aid.getId() + "";
-				}
-
-				PipeIPCProcess ffAudioPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegaudio01", System.currentTimeMillis() + "audioout", false, true);
-				StreamModifier sm = new StreamModifier();
-				sm.setPcm(pcm);
-				sm.setDtsembed(dts);
-				sm.setNbchannels(sm.isDtsembed() ? 2 : CodecUtil.getRealChannelCount(configuration, params.aid));
-				sm.setSampleFrequency(48000);
-				sm.setBitspersample(16);
-				String mixer = CodecUtil.getMixerOutput(!sm.isDtsembed(), sm.getNbchannels(), configuration.getAudioChannelCount());
-
-				// it seems the -really-quiet prevents mencoder to stop the pipe output after some time...
-				// -mc 0.1 make the DTS-HD extraction works better with latest mencoder builds, and makes no impact on the regular DTS one
-				String ffmpegLPCMextract[] = new String[]{
-					executable(), 
-					"-ss", "0",
-					fileName,
-					"-really-quiet",
-					"-msglevel", "statusline=2",
-					"-channels", "" + sm.getNbchannels(),
-					"-ovc", "copy",
-					"-of", "rawaudio",
-					"-mc", dts ? "0.1" : "0",
-					"-noskip",
-					(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
-					"-oac", sm.isDtsembed() ? "copy" : "pcm",
-					(StringUtils.isNotBlank(mixer) && !channels_filter_present) ? "-af" : "-quiet", (StringUtils.isNotBlank(mixer) && !channels_filter_present) ? mixer : "-quiet",
-					"-srate", "48000",
-					"-o", ffAudioPipe.getInputPipe()
-				};
-
-				if (!params.mediaRenderer.isMuxDTSToMpeg()) { // no need to use the PCM trick when media renderer supports DTS
-					ffAudioPipe.setModifier(sm);
-				}
-
-				if (media != null && media.getDvdtrack() > 0) {
-					ffmpegLPCMextract[3] = "-dvd-device";
-					ffmpegLPCMextract[4] = fileName;
-					ffmpegLPCMextract[5] = "dvd://" + media.getDvdtrack();
-				} else if (params.stdin != null) {
-					ffmpegLPCMextract[3] = "-";
-				}
-
-				if (fileName.toLowerCase().endsWith(".evo")) {
-					ffmpegLPCMextract[4] = "-psprobe";
-					ffmpegLPCMextract[5] = "1000000";
-				}
-
-				if (params.timeseek > 0) {
-					ffmpegLPCMextract[2] = "" + params.timeseek;
-				}
-
-				OutputParams ffaudioparams = new OutputParams(configuration);
-				ffaudioparams.maxBufferSize = 1;
-				ffaudioparams.stdin = params.stdin;
-				ProcessWrapperImpl ffAudio = new ProcessWrapperImpl(ffmpegLPCMextract, ffaudioparams);
-
-				params.stdin = null;
-
-				PrintWriter pwMux = new PrintWriter(f);
-				pwMux.println("MUXOPT --no-pcr-on-video-pid --no-asyncio --new-audio-pes --vbr --vbv-len=500");
-				String videoType = "V_MPEG-2";
-
-				if (params.no_videoencode && params.forceType != null) {
-					videoType = params.forceType;
-				}
-
-				String fps = "";
-				if (params.forceFps != null) {
-					fps = "fps=" + params.forceFps + ", ";
-				}
-
-				String audioType = "A_LPCM";
-				if (params.mediaRenderer.isMuxDTSToMpeg()) {
-					audioType = "A_DTS";
-				}
-
-				if (params.lossyaudio) {
-					audioType = "A_AC3";
-				}
-
-				pwMux.println(videoType + ", \"" + ffVideoPipe.getOutputPipe() + "\", " + fps + "level=4.1, insertSEI, contSPS, track=1");
-				pwMux.println(audioType + ", \"" + ffAudioPipe.getOutputPipe() + "\", track=2");
-				pwMux.close();
-
-				ProcessWrapper pipe_process = pipe.getPipeProcess();
-				pw.attachProcess(pipe_process);
-				pipe_process.runInNewThread();
-
-				try {
-					Thread.sleep(50);
-				} catch (InterruptedException e) {
-				}
-
-				pipe.deleteLater();
-				params.input_pipes[0] = pipe;
-
-				ProcessWrapper ff_pipe_process = ffAudioPipe.getPipeProcess();
-				pw.attachProcess(ff_pipe_process);
-				ff_pipe_process.runInNewThread();
-
-				try {
-					Thread.sleep(50);
-				} catch (InterruptedException e) {
-				}
-
-				ffAudioPipe.deleteLater();
-				pw.attachProcess(ffAudio);
-				ffAudio.runInNewThread();
 			}
+
+			pipe = new PipeProcess(System.currentTimeMillis() + "tsmuxerout.ts");
+
+			TSMuxerVideo ts = new TSMuxerVideo(configuration);
+			File f = new File(configuration.getTempFolder(), "pms-tsmuxer.meta");
+			String cmd[] = new String[]{ts.executable(), f.getAbsolutePath(), pipe.getInputPipe()};
+			pw = new ProcessWrapperImpl(cmd, params);
+
+			PipeIPCProcess ffVideoPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegvideo", System.currentTimeMillis() + "videoout", false, true);
+			cmdArray[cmdArray.length - 1] = ffVideoPipe.getInputPipe();
+
+			OutputParams ffparams = new OutputParams(configuration);
+			ffparams.maxBufferSize = 1;
+			ffparams.stdin = params.stdin;
+			ProcessWrapperImpl ffVideo = new ProcessWrapperImpl(cmdArray, ffparams);
+
+			ProcessWrapper ff_video_pipe_process = ffVideoPipe.getPipeProcess();
+			pw.attachProcess(ff_video_pipe_process);
+			ff_video_pipe_process.runInNewThread();
+			ffVideoPipe.deleteLater();
+
+			pw.attachProcess(ffVideo);
+			ffVideo.runInNewThread();
+
+			String aid = null;
+			if (media != null && media.getAudioCodes().size() > 1 && params.aid != null) {
+				aid = params.aid.getId() + "";
+			}
+
+			PipeIPCProcess ffAudioPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegaudio01", System.currentTimeMillis() + "audioout", false, true);
+			StreamModifier sm = new StreamModifier();
+			sm.setPcm(pcm);
+			sm.setDtsembed(dts);
+			sm.setNbchannels(sm.isDtsembed() ? 2 : CodecUtil.getRealChannelCount(configuration, params.aid));
+			sm.setSampleFrequency(48000);
+			sm.setBitspersample(16);
+			String mixer = CodecUtil.getMixerOutput(!sm.isDtsembed(), sm.getNbchannels(), configuration.getAudioChannelCount());
+
+			// It seems the -really-quiet prevents MEncoder from stopping the pipe output after some time.
+			// -mc 0.1 makes the DTS-HD extraction work better and makes no impact on the regular DTS one
+			String ffmpegLPCMextract[] = new String[]{
+				executable(), 
+				"-ss", "0",
+				fileName,
+				"-really-quiet",
+				"-msglevel", "statusline=2",
+				"-channels", "" + sm.getNbchannels(),
+				"-ovc", "copy",
+				"-of", "rawaudio",
+				"-mc", dts ? "0.1" : "0",
+				"-noskip",
+				(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
+				"-oac", sm.isDtsembed() ? "copy" : "pcm",
+				(StringUtils.isNotBlank(mixer) && !channels_filter_present) ? "-af" : "-quiet", (StringUtils.isNotBlank(mixer) && !channels_filter_present) ? mixer : "-quiet",
+				"-srate", "48000",
+				"-o", ffAudioPipe.getInputPipe()
+			};
+
+			if (!params.mediaRenderer.isMuxDTSToMpeg()) { // no need to use the PCM trick when media renderer supports DTS
+				ffAudioPipe.setModifier(sm);
+			}
+
+			if (media != null && media.getDvdtrack() > 0) {
+				ffmpegLPCMextract[3] = "-dvd-device";
+				ffmpegLPCMextract[4] = fileName;
+				ffmpegLPCMextract[5] = "dvd://" + media.getDvdtrack();
+			} else if (params.stdin != null) {
+				ffmpegLPCMextract[3] = "-";
+			}
+
+			if (fileName.toLowerCase().endsWith(".evo")) {
+				ffmpegLPCMextract[4] = "-psprobe";
+				ffmpegLPCMextract[5] = "1000000";
+			}
+
+			if (params.timeseek > 0) {
+				ffmpegLPCMextract[2] = "" + params.timeseek;
+			}
+
+			OutputParams ffaudioparams = new OutputParams(configuration);
+			ffaudioparams.maxBufferSize = 1;
+			ffaudioparams.stdin = params.stdin;
+			ProcessWrapperImpl ffAudio = new ProcessWrapperImpl(ffmpegLPCMextract, ffaudioparams);
+
+			params.stdin = null;
+
+			PrintWriter pwMux = new PrintWriter(f);
+			pwMux.println("MUXOPT --no-pcr-on-video-pid --no-asyncio --new-audio-pes --vbr --vbv-len=500");
+			String videoType = "V_MPEG-2";
+
+			if (params.no_videoencode && params.forceType != null) {
+				videoType = params.forceType;
+			}
+
+			String fps = "";
+			if (params.forceFps != null) {
+				fps = "fps=" + params.forceFps + ", ";
+			}
+
+			String audioType = "A_LPCM";
+			if (params.mediaRenderer.isMuxDTSToMpeg()) {
+				audioType = "A_DTS";
+			}
+
+			if (params.lossyaudio) {
+				audioType = "A_AC3";
+			}
+
+			pwMux.println(videoType + ", \"" + ffVideoPipe.getOutputPipe() + "\", " + fps + "level=4.1, insertSEI, contSPS, track=1");
+			pwMux.println(audioType + ", \"" + ffAudioPipe.getOutputPipe() + "\", track=2");
+			pwMux.close();
+
+			ProcessWrapper pipe_process = pipe.getPipeProcess();
+			pw.attachProcess(pipe_process);
+			pipe_process.runInNewThread();
+
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+			}
+
+			pipe.deleteLater();
+			params.input_pipes[0] = pipe;
+
+			ProcessWrapper ff_pipe_process = ffAudioPipe.getPipeProcess();
+			pw.attachProcess(ff_pipe_process);
+			ff_pipe_process.runInNewThread();
+
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+			}
+
+			ffAudioPipe.deleteLater();
+			pw.attachProcess(ffAudio);
+			ffAudio.runInNewThread();
 		} else {
 			boolean directpipe = Platform.isMac() || Platform.isFreeBSD();
 			if (directpipe) {
