@@ -8,6 +8,7 @@ class ProgramPathDisabler implements ProgramPaths {
 	private boolean disableDCraw = false;
 	private boolean disableIMConvert = false;
 	private boolean disableInterFrame = false;
+	private boolean disableAviSynthDLL = false;
 	private final ProgramPaths ifEnabled;
 
 	public ProgramPathDisabler(ProgramPaths ifEnabled) {
