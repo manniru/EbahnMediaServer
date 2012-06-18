@@ -1071,7 +1071,7 @@ public class MEncoderVideo extends Player {
 			return new String[]{
 				"-quiet",
 				"-nosound",
-				"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dts || mux) ? "rawvideo" : "mpeg")),
+				"-of", (wmv || mpegts) ? "lavf" : (pcm) ? "avi" : (((dts || mux) ? "rawvideo" : "mpeg")),
 				(wmv || mpegts) ? "-lavfopts" : "-quiet",
 				wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
 				"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
