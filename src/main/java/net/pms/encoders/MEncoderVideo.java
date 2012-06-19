@@ -2254,7 +2254,7 @@ public class MEncoderVideo extends Player {
 
 		ProcessWrapperImpl pw = null;
 
-		if (pcm || dts || mux) {
+		if (pcm || dts || mux || (avisynth() && configuration.isAvisynthDSS2())) {
 			boolean channels_filter_present = false;
 
 			for (String s : cmdArray) {
