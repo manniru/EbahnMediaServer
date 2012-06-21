@@ -232,14 +232,14 @@ public class TSMuxerVideo extends Player {
 				boolean dtsRemux = false;
 				boolean pcm = false;
 
-				// disable LPCM transcoding for MP4 container with non-H264 video as workaround for mencoder's A/V sync bug
+				// Disable LPCM transcoding for MP4 container with non-H264 video as workaround for MEncoder's A/V sync bug
 				boolean mp4_with_non_h264 = (media.getContainer().equals("mp4") && !media.getCodecV().equals("h264"));
 
 				if (numAudioTracks <= 1) {
 					ffAudioPipe = new PipeIPCProcess[numAudioTracks];
 					ffAudioPipe[0] = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegaudio01", System.currentTimeMillis() + "audioout", false, true);
 
-					// disable AC3 remux for stereo tracks with 384 kbits bitrate and PS3 renderer (PS3 FW bug?)
+					// Disable AC3 remux for stereo tracks with 384 kbits bitrate and PS3 renderer (PS3 FW bug?)
 					boolean ps3_and_stereo_and_384_kbits = (params.mediaRenderer.getRendererName().equalsIgnoreCase("Playstation 3") && params.aid.getNrAudioChannels() == 2) && (params.aid.getBitRate() > 370000 && params.aid.getBitRate() < 400000);
 					ac3Remux = (params.aid.isAC3() && !ps3_and_stereo_and_384_kbits && configuration.isRemuxAC3());
 					dtsRemux = configuration.isDTSEmbedInPCM() && params.aid.isDTS() && params.mediaRenderer.isDTSPlayable();
@@ -262,7 +262,8 @@ public class TSMuxerVideo extends Player {
 								)
 							)
 						) && params.mediaRenderer.isLPCMPlayable();
-					if ( !ac3Remux && (dtsRemux || pcm) ) {
+
+					if (!ac3Remux && (dtsRemux || pcm)) {
 						StreamModifier sm = new StreamModifier();
 						sm.setPcm(pcm);
 						sm.setDtsembed(dtsRemux);
@@ -289,8 +290,9 @@ public class TSMuxerVideo extends Player {
 							"-srate", "48000",
 							"-o", ffAudioPipe[0].getInputPipe()
 						};
-						if (!params.mediaRenderer.isMuxDTSToMpeg())   // use PCM trick when media renderer does not support DTS in MPEG
-						{
+
+						// use PCM trick when media renderer does not support DTS in MPEG
+						if (!params.mediaRenderer.isMuxDTSToMpeg()) {
 							ffAudioPipe[0].setModifier(sm);
 						}
 					} else {
