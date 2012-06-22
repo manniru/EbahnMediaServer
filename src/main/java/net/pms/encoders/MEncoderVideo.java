@@ -1390,7 +1390,8 @@ public class MEncoderVideo extends Player {
 				avisynth() &&
 				!configuration.isAvisynthDSS2()
 			) &&
-			params.mediaRenderer.isTranscodeToAC3()) {
+			params.mediaRenderer.isTranscodeToAC3()
+		) {
 			// AC3 remux takes priority
 			oaccopy = true;
 		} else {
@@ -1406,6 +1407,7 @@ public class MEncoderVideo extends Player {
 					!configuration.isAvisynthDSS2()
 				) &&
 				params.mediaRenderer.isDTSPlayable();
+
 			pcm = configuration.isMencoderUsePcm() &&
 				(
 					!dvd ||
@@ -2347,25 +2349,56 @@ public class MEncoderVideo extends Player {
 			sm.setBitspersample(16);
 			String mixer = CodecUtil.getMixerOutput(!sm.isDtsembed(), sm.getNbchannels(), configuration.getAudioChannelCount());
 
-			// It seems the -really-quiet prevents MEncoder from stopping the pipe output after some time.
-			// -mc 0.1 makes the DTS-HD extraction work better and makes no impact on the regular DTS one
-			String ffmpegLPCMextract[] = new String[]{
-				executable(), 
-				"-ss", "0",
-				fileName,
-				"-really-quiet",
-				"-msglevel", "statusline=2",
-				"-channels", "" + sm.getNbchannels(),
-				"-ovc", "copy",
-				"-of", "rawaudio",
-				"-mc", dts ? "0.1" : "0",
-				"-noskip",
-				(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
-				"-oac", sm.isDtsembed() ? "copy" : "pcm",
-				(StringUtils.isNotBlank(mixer) && !channels_filter_present) ? "-af" : "-quiet", (StringUtils.isNotBlank(mixer) && !channels_filter_present) ? mixer : "-quiet",
-				"-srate", "48000",
-				"-o", ffAudioPipe.getInputPipe()
-			};
+			String ffmpegLPCMextract[];
+			boolean ac3Remux;
+			boolean dtsRemux;
+
+			ac3Remux = (params.aid.isAC3() && !ps3_and_stereo_and_384_kbits && configuration.isRemuxAC3());
+			dtsRemux = configuration.isDTSEmbedInPCM() && params.aid.isDTS() && params.mediaRenderer.isDTSPlayable();
+
+			if (!ac3Remux && (dtsRemux || pcm)) {
+				// It seems the -really-quiet prevents MEncoder from stopping the pipe output after some time.
+				// -mc 0.1 makes the DTS-HD extraction work better and makes no impact on the regular DTS one
+				ffmpegLPCMextract = new String[]{
+					executable(), 
+					"-ss", "0",
+					fileName,
+					"-really-quiet",
+					"-msglevel", "statusline=2",
+					"-channels", "" + sm.getNbchannels(),
+					"-ovc", "copy",
+					"-of", "rawaudio",
+					"-mc", dts ? "0.1" : "0",
+					"-noskip",
+					(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
+					"-oac", sm.isDtsembed() ? "copy" : "pcm",
+					(StringUtils.isNotBlank(mixer) && !channels_filter_present) ? "-af" : "-quiet", (StringUtils.isNotBlank(mixer) && !channels_filter_present) ? mixer : "-quiet",
+					"-srate", "48000",
+					"-o", ffAudioPipe.getInputPipe()
+				};
+			} else {
+				ffmpegLPCMextract = new String[]{
+					executable(),
+					"-ss", "0",
+					fileName,
+					"-quiet",
+					"-quiet",
+					"-really-quiet",
+					"-msglevel", "statusline=2",
+					"-channels", "" + CodecUtil.getAC3ChannelCount(configuration, params.aid),
+					"-ovc", "copy",
+					"-of", "rawaudio",
+					"-mc", "0",
+					"-noskip",
+					"-oac", (ac3Remux) ? "copy" : "lavc",
+					params.aid.isAC3() ? "-fafmttag" : "-quiet", params.aid.isAC3() ? "0x2000" : "-quiet",
+					"-lavcopts", "acodec=" + (configuration.isMencoderAc3Fixed() ? "ac3_fixed" : "ac3") + ":abitrate=" + CodecUtil.getAC3Bitrate(configuration, params.aid),
+					"-af", "lavcresample=48000",
+					"-srate", "48000",
+					(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
+					"-o", ffAudioPipe.getInputPipe()
+				};
+			}
 
 			if (!params.mediaRenderer.isMuxDTSToMpeg()) { // no need to use the PCM trick when media renderer supports DTS
 				ffAudioPipe.setModifier(sm);
@@ -2408,13 +2441,20 @@ public class MEncoderVideo extends Player {
 				fps = "fps=" + params.forceFps + ", ";
 			}
 
-			String audioType = "A_LPCM";
-			if (params.mediaRenderer.isMuxDTSToMpeg()) {
-				audioType = "A_DTS";
-			}
-
-			if (params.lossyaudio) {
+			String audioType = "A_AC3";
+			if (ac3Remux) {
+				// AC3 remux takes priority
 				audioType = "A_AC3";
+			} else {
+				if (pcm) {
+					audioType = "A_LPCM";
+				}
+				if (dtsRemux) {
+					audioType = "A_LPCM";
+					if (params.mediaRenderer.isMuxDTSToMpeg()) {
+						audioType = "A_DTS";
+					}
+				}
 			}
 
 			pwMux.println(videoType + ", \"" + ffVideoPipe.getOutputPipe() + "\", " + fps + "level=4.1, insertSEI, contSPS, track=1");
