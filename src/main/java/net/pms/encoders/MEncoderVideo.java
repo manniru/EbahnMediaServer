@@ -2466,7 +2466,7 @@ public class MEncoderVideo extends Player {
 			pipe_process.runInNewThread();
 
 			try {
-				Thread.sleep(50);
+				Thread.sleep(100);
 			} catch (InterruptedException e) {
 			}
 
