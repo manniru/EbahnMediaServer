@@ -359,7 +359,7 @@ public class FFMpegVideo extends Player {
 			fileName = ProcessUtil.getShortFileNameIfWideChars(fileName);
 		}
 
-		String movieLine       = "";
+		String movieLine;
 		String mtLine1         = "";
 		String mtLine2         = "";
 		String mtLine3         = "";
@@ -368,7 +368,7 @@ public class FFMpegVideo extends Player {
 		String avisynthDLLPath = PMS.getConfiguration().getAviSynthDLLPath();
 
 		if (PMS.getConfiguration().isAvisynthDSS2()) {
-			movieLine = "LoadPlugin(\"" + avisynthDLLPath + "avss.dll\")\nDSS2(\"" + fileName + "\"" + convertfps + ")";
+			movieLine = "LoadPlugin(\"" + avisynthDLLPath + "avss.dll\")\nDSS2(\"" + fileName + "\"" + directShowFPS + convertfps + ")" + assumeFPS;
 		} else {
 			movieLine = "DirectShowSource(\"" + fileName + "\"" + directShowFPS + convertfps + ")" + assumeFPS;
 		}
