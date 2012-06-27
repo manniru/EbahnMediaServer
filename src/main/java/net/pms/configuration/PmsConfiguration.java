@@ -18,21 +18,14 @@
  */
 package net.pms.configuration;
 
+import com.sun.jna.Platform;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-
-import net.pms.io.SystemUtils;
+import java.util.*;
 import net.pms.Messages;
-
+import net.pms.io.SystemUtils;
 import net.pms.util.PropertiesUtil;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -43,8 +36,6 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.sun.jna.Platform;
 
 /**
  * Container for all configurable PMS settings. Settings are typically defined by three things:
@@ -716,7 +707,7 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Some versions of mencoder produce garbled audio because the "ac3" codec is used
+	 * Some versions of MEncoder produce garbled audio because the "ac3" codec is used
 	 * instead of the "ac3_fixed" codec. Returns true if "ac3_fixed" should be used.
 	 * Default is false.
 	 * See https://code.google.com/p/ps3mediaserver/issues/detail?id=1092#c1
@@ -795,7 +786,7 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Some versions of mencoder produce garbled audio because the "ac3" codec is used
+	 * Some versions of MEncoder produce garbled audio because the "ac3" codec is used
 	 * instead of the "ac3_fixed" codec.
 	 * See https://code.google.com/p/ps3mediaserver/issues/detail?id=1092#c1
 	 * @param value Set to true if "ac3_fixed" should be used.
@@ -861,7 +852,7 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Set the maximum number of concurrent mencoder threads.
+	 * Set the maximum number of concurrent MEncoder threads.
 	 * XXX Currently unused.
 	 * @param value The maximum number of concurrent threads.
 	 */
@@ -881,11 +872,11 @@ public class PmsConfiguration {
 	/**
 	 * Returns the number of seconds from the start of a video file (the seek
 	 * position) where the thumbnail image for the movie should be extracted
-	 * from. Default is 1 second.
+	 * from. Default is 2 seconds.
 	 * @return The seek position in seconds.
 	 */
 	public int getThumbnailSeekPos() {
-		return getInt(KEY_THUMBNAIL_SEEK_POS, 1);
+		return getInt(KEY_THUMBNAIL_SEEK_POS, 2);
 	}
 
 	/**
@@ -899,11 +890,11 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Older versions of mencoder do not support ASS/SSA subtitles on all
-	 * platforms. Returns true if mencoder supports them. Default is true
+	 * Older versions of MEncoder do not support ASS/SSA subtitles on all
+	 * platforms. Returns true if MEncoder supports them. Default is true
 	 * on Windows and OS X, false otherwise.
 	 * See https://code.google.com/p/ps3mediaserver/issues/detail?id=1097
-	 * @return True if mencoder supports ASS/SSA subtitles.
+	 * @return True if MEncoder supports ASS/SSA subtitles.
 	 */
 	public boolean isMencoderAss() {
 		return getBoolean(KEY_MENCODER_ASS, Platform.isWindows() || Platform.isMac());
@@ -1175,11 +1166,11 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Older versions of mencoder do not support ASS/SSA subtitles on all
-	 * platforms. Set to true if mencoder supports them. Default should be
+	 * Older versions of MEncoder do not support ASS/SSA subtitles on all
+	 * platforms. Set to true if MEncoder supports them. Default should be
 	 * true on Windows and OS X, false otherwise.
 	 * See https://code.google.com/p/ps3mediaserver/issues/detail?id=1097
-	 * @param value Set to true if mencoder supports ASS/SSA subtitles.
+	 * @param value Set to true if MEncoder supports ASS/SSA subtitles.
 	 */
 	public void setMencoderAss(boolean value) {
 		configuration.setProperty(KEY_MENCODER_ASS, value);

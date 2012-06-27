@@ -1,12 +1,28 @@
-﻿1.1.2 - 2012-06-??
+﻿1.2.0 - 2012-06-26
 
 	General:
-		Disabled bandwidth limit by default because it can cause stuttering for some users with slower CPUs
-		Avoid blank thumbnails by seeking 60 s from start
+		Create thumbnails from 2 seconds into the video by default
 		Fixed silent installation
+		Updated MPlayer and MEncoder for Windows to SB35, which:
+			Supports more colours in ASS/SSA subtitles
+			Fixes memory leaks
+			Starts faster
+			Improves fonts
+			Improves caching
+			Improves multithreading stability
 		Updated MPlayer and MEncoder for OSX to SB32
+		Lots of code optimisations
+		Made program restarts more reliable
+		Fixed AviSynth ConvertFPS option
+		Improved AviSynth frame-serving stability
 	Renderers:
+		Added support for DirecTV HR series (thanks, DeFlanko!)
 		Added workaround for 2.0 384 kbits AC3 PS3 audio bug (PMS issue #230 & #1414)
+		Improved support for Panasonic TVs
+	Installer:
+		Only offer to run AviSynth installer if it isn't already installed
+	Languages:
+		Updated Czech
 
 1.1.1 - 2012-06-14
 
