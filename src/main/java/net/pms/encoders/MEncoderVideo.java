@@ -1030,23 +1030,23 @@ public class MEncoderVideo extends Player {
 	protected String[] getDefaultArgs() {
 		if (avisynth() && configuration.isAvisynthDSS2()) {
 			return new String[]{
-				"-quiet",
+				"",
 				"-nosound",
 				"-of", "rawvideo",
-				(wmv || mpegts) ? "-lavfopts" : "-quiet",
-				wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
+				(wmv || mpegts) ? "-lavfopts" : "",
+				wmv ? "format=asf" : (mpegts ? "format=mpegts" : ""),
 				"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
-				"-ovc", (mux || ovccopy) ? "copy" : "lavc"
+				"-ovc", (ac3Remux && ovccopy) ? "copy" : "lavc"
 			};
 		} else {
 			return new String[]{
-				"-quiet",
-				"-oac", oaccopy ? "copy" : (pcm ? "pcm" : "lavc"),
-				"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dts || mux) ? "rawvideo" : "mpeg")),
-				(wmv || mpegts) ? "-lavfopts" : "-quiet",
-				wmv ? "format=asf" : (mpegts ? "format=mpegts" : "-quiet"),
+				"",
+				"-oac", (ac3Remux || dtsRemux) ? "copy" : (pcm ? "pcm" : "lavc"),
+				"-of", (wmv || mpegts) ? "lavf" : (pcm && avisynth()) ? "avi" : (((pcm || dtsRemux || ac3Remux) ? "rawvideo" : "mpeg")),
+				(wmv || mpegts) ? "-lavfopts" : "",
+				wmv ? "format=asf" : (mpegts ? "format=mpegts" : ""),
 				"-mpegopts", "format=mpeg2:muxrate=500000:vbuf_size=1194:abuf_size=64",
-				"-ovc", (mux || ovccopy) ? "copy" : "lavc"
+				"-ovc", (ac3Remux && ovccopy) ? "copy" : "lavc"
 			};
 		}
 	}
@@ -1756,7 +1756,7 @@ public class MEncoderVideo extends Player {
 				!configuration.isAvisynthDSS2()
 			) &&
 			params.aid != null &&
-			media.getAudioCodes().size() > 1
+			media.getAudioTracksList().size() > 1
 		) {
 			cmdArray[cmdArray.length - 12] = "-aid";
 			boolean lavf = false; // Need to add support for LAVF demuxing
@@ -2251,7 +2251,7 @@ public class MEncoderVideo extends Player {
 				}
 				videoPipe.deleteLater();
 				audioPipe.deleteLater();
-			} else if (!(avisynth() && configuration.isAvisynthDSS2())) {
+			} else {
 				// Remove the -oac switch to prevent video packet errors appearing
 				for (int s = 0; s < cmdArray.length; s++) {
 					if (cmdArray[s].equals("-oac")) {
@@ -2260,35 +2260,30 @@ public class MEncoderVideo extends Player {
 						break;
 					}
 				}
-			}
 
-			pipe = new PipeProcess(System.currentTimeMillis() + "tsmuxerout.ts");
+				pipe = new PipeProcess(System.currentTimeMillis() + "tsmuxerout.ts");
 
-			TSMuxerVideo ts = new TSMuxerVideo(configuration);
-			File f = new File(configuration.getTempFolder(), "pms-tsmuxer.meta");
-			String cmd[] = new String[]{ts.executable(), f.getAbsolutePath(), pipe.getInputPipe()};
-			pw = new ProcessWrapperImpl(cmd, params);
+				TSMuxerVideo ts = new TSMuxerVideo(configuration);
+				File f = new File(configuration.getTempFolder(), "pms-tsmuxer.meta");
+				String cmd[] = new String[]{ts.executable(), f.getAbsolutePath(), pipe.getInputPipe()};
+				pw = new ProcessWrapperImpl(cmd, params);
 
-			PipeIPCProcess ffVideoPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegvideo", System.currentTimeMillis() + "videoout", false, true);
-			cmdArray[cmdArray.length - 1] = ffVideoPipe.getInputPipe();
+				PipeIPCProcess ffVideoPipe = new PipeIPCProcess(System.currentTimeMillis() + "ffmpegvideo", System.currentTimeMillis() + "videoout", false, true);
 
-			OutputParams ffparams = new OutputParams(configuration);
-			ffparams.maxBufferSize = 1;
-			ffparams.stdin = params.stdin;
-			ProcessWrapperImpl ffVideo = new ProcessWrapperImpl(cmdArray, ffparams);
+				cmdArray[cmdArray.length - 1] = ffVideoPipe.getInputPipe();
 
-			ProcessWrapper ff_video_pipe_process = ffVideoPipe.getPipeProcess();
-			pw.attachProcess(ff_video_pipe_process);
-			ff_video_pipe_process.runInNewThread();
-			ffVideoPipe.deleteLater();
+				OutputParams ffparams = new OutputParams(configuration);
+				ffparams.maxBufferSize = 1;
+				ffparams.stdin = params.stdin;
+				ProcessWrapperImpl ffVideo = new ProcessWrapperImpl(cmdArray, ffparams);
 
-			pw.attachProcess(ffVideo);
-			ffVideo.runInNewThread();
+				ProcessWrapper ff_video_pipe_process = ffVideoPipe.getPipeProcess();
+				pw.attachProcess(ff_video_pipe_process);
+				ff_video_pipe_process.runInNewThread();
+				ffVideoPipe.deleteLater();
 
-			String aid = null;
-			if (media != null && media.getAudioCodes().size() > 1 && params.aid != null) {
-				aid = params.aid.getId() + "";
-			}
+				pw.attachProcess(ffVideo);
+				ffVideo.runInNewThread();
 
 				String aid = null;
 				if (media != null && media.getAudioTracksList().size() > 1 && params.aid != null) {
@@ -2335,70 +2330,47 @@ public class MEncoderVideo extends Player {
 					"-srate", "48000",
 					"-o", ffAudioPipe.getInputPipe()
 				};
-			} else {
-				ffmpegLPCMextract = new String[]{
-					executable(),
-					"-ss", "0",
-					fileName,
-					"-quiet",
-					"-quiet",
-					"-really-quiet",
-					"-msglevel", "statusline=2",
-					"-channels", "" + CodecUtil.getAC3ChannelCount(configuration, params.aid),
-					"-ovc", "copy",
-					"-of", "rawaudio",
-					"-mc", "0",
-					"-noskip",
-					"-oac", (ac3Remux) ? "copy" : "lavc",
-					params.aid.isAC3() ? "-fafmttag" : "-quiet", params.aid.isAC3() ? "0x2000" : "-quiet",
-					"-lavcopts", "acodec=" + (configuration.isMencoderAc3Fixed() ? "ac3_fixed" : "ac3") + ":abitrate=" + CodecUtil.getAC3Bitrate(configuration, params.aid),
-					"-af", "lavcresample=48000",
-					"-srate", "48000",
-					(aid == null) ? "-quiet" : "-aid", (aid == null) ? "-quiet" : aid,
-					"-o", ffAudioPipe.getInputPipe()
-				};
-			}
 
-			if (!params.mediaRenderer.isMuxDTSToMpeg()) { // no need to use the PCM trick when media renderer supports DTS
-				ffAudioPipe.setModifier(sm);
-			}
+				if (!params.mediaRenderer.isMuxDTSToMpeg()) { // no need to use the PCM trick when media renderer supports DTS
+					ffAudioPipe.setModifier(sm);
+				}
 
-			if (media != null && media.getDvdtrack() > 0) {
-				ffmpegLPCMextract[3] = "-dvd-device";
-				ffmpegLPCMextract[4] = fileName;
-				ffmpegLPCMextract[5] = "dvd://" + media.getDvdtrack();
-			} else if (params.stdin != null) {
-				ffmpegLPCMextract[3] = "-";
-			}
+				if (media != null && media.getDvdtrack() > 0) {
+					ffmpegLPCMextract[3] = "-dvd-device";
+					ffmpegLPCMextract[4] = fileName;
+					ffmpegLPCMextract[5] = "dvd://" + media.getDvdtrack();
+				} else if (params.stdin != null) {
+					ffmpegLPCMextract[3] = "-";
+				}
 
-			if (fileName.toLowerCase().endsWith(".evo")) {
-				ffmpegLPCMextract[4] = "-psprobe";
-				ffmpegLPCMextract[5] = "1000000";
-			}
+				if (fileName.toLowerCase().endsWith(".evo")) {
+					ffmpegLPCMextract[4] = "-psprobe";
+					ffmpegLPCMextract[5] = "1000000";
+				}
 
-			if (params.timeseek > 0) {
-				ffmpegLPCMextract[2] = "" + params.timeseek;
-			}
+				if (params.timeseek > 0) {
+					ffmpegLPCMextract[2] = "" + params.timeseek;
+				}
 
-			OutputParams ffaudioparams = new OutputParams(configuration);
-			ffaudioparams.maxBufferSize = 1;
-			ffaudioparams.stdin = params.stdin;
-			ProcessWrapperImpl ffAudio = new ProcessWrapperImpl(ffmpegLPCMextract, ffaudioparams);
+				OutputParams ffaudioparams = new OutputParams(configuration);
+				ffaudioparams.maxBufferSize = 1;
+				ffaudioparams.stdin = params.stdin;
+				ProcessWrapperImpl ffAudio = new ProcessWrapperImpl(ffmpegLPCMextract, ffaudioparams);
 
-			params.stdin = null;
+				params.stdin = null;
 
-			PrintWriter pwMux = new PrintWriter(f);
-			pwMux.println("MUXOPT --no-pcr-on-video-pid --no-asyncio --new-audio-pes --vbr --vbv-len=500");
-			String videoType = "V_MPEG-2";
+				PrintWriter pwMux = new PrintWriter(f);
+				pwMux.println("MUXOPT --no-pcr-on-video-pid --no-asyncio --new-audio-pes --vbr --vbv-len=500");
+				String videoType = "V_MPEG-2";
 
-			if (params.no_videoencode && params.forceType != null) {
-				videoType = params.forceType;
-			}
+				if (params.no_videoencode && params.forceType != null) {
+					videoType = params.forceType;
+				}
 
-			String fps = "";
-			if (params.forceFps != null) {
-				fps = "fps=" + params.forceFps + ", ";
-			}
+				String fps = "";
+				if (params.forceFps != null) {
+					fps = "fps=" + params.forceFps + ", ";
+				}
 
 				String audioType;
 				if (ac3Remux) {
@@ -2415,13 +2387,10 @@ public class MEncoderVideo extends Player {
 					// PCM
 					audioType = "A_LPCM";
 				}
-				if (dtsRemux) {
-					audioType = "A_LPCM";
-					if (params.mediaRenderer.isMuxDTSToMpeg()) {
-						audioType = "A_DTS";
-					}
+
+				if (params.lossyaudio) {
+					audioType = "A_AC3";
 				}
-			}
 
 				// MEncoder bug (confirmed with MEncoder r35003 + FFmpeg 0.11.1)
 				// Audio delay is ignored when playing from file start (-ss 0)
@@ -2435,30 +2404,31 @@ public class MEncoderVideo extends Player {
 				pwMux.println(audioType + ", \"" + ffAudioPipe.getOutputPipe() + "\", " + timeshift + "track=2");
 				pwMux.close();
 
-			ProcessWrapper pipe_process = pipe.getPipeProcess();
-			pw.attachProcess(pipe_process);
-			pipe_process.runInNewThread();
+				ProcessWrapper pipe_process = pipe.getPipeProcess();
+				pw.attachProcess(pipe_process);
+				pipe_process.runInNewThread();
 
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+				}
+
+				pipe.deleteLater();
+				params.input_pipes[0] = pipe;
+
+				ProcessWrapper ff_pipe_process = ffAudioPipe.getPipeProcess();
+				pw.attachProcess(ff_pipe_process);
+				ff_pipe_process.runInNewThread();
+
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+				}
+
+				ffAudioPipe.deleteLater();
+				pw.attachProcess(ffAudio);
+				ffAudio.runInNewThread();
 			}
-
-			pipe.deleteLater();
-			params.input_pipes[0] = pipe;
-
-			ProcessWrapper ff_pipe_process = ffAudioPipe.getPipeProcess();
-			pw.attachProcess(ff_pipe_process);
-			ff_pipe_process.runInNewThread();
-
-			try {
-				Thread.sleep(50);
-			} catch (InterruptedException e) {
-			}
-
-			ffAudioPipe.deleteLater();
-			pw.attachProcess(ffAudio);
-			ffAudio.runInNewThread();
 		} else {
 			boolean directpipe = Platform.isMac() || Platform.isFreeBSD();
 			if (directpipe) {

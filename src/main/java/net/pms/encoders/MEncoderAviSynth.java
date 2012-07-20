@@ -141,6 +141,7 @@ public class MEncoderAviSynth extends MEncoderVideo {
 		aviSynthScriptInstructionsContainer.setEditable(false);
 		aviSynthScriptInstructionsContainer.setBorder(BorderFactory.createEtchedBorder());
 		aviSynthScriptInstructionsContainer.setBackground(new Color(255, 255, 192));
+		aviSynthScriptInstructionsContainer.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(new Color(130, 135, 144)), BorderFactory.createEmptyBorder(3, 5, 3, 5)));
 		builder.add(aviSynthScriptInstructionsContainer, cc.xy(2, 13));
 
 		String clip = PMS.getConfiguration().getAvisynthScript();
