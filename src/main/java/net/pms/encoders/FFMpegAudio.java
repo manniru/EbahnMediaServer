@@ -143,4 +143,29 @@ public class FFMpegAudio extends FFMpegVideo {
 		}
 		return getFFMpegTranscode(fileName, dlna, media, params, args);
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.AUDIO) {
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.FLAC)
+					|| id.equals(Format.Identifier.M4A)
+					|| id.equals(Format.Identifier.OGG)
+					|| id.equals(Format.Identifier.WAV)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }

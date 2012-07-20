@@ -152,4 +152,26 @@ public class MEncoderWebVideo extends Player {
 	public int type() {
 		return Format.VIDEO;
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.VIDEO) {
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.WEB)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }

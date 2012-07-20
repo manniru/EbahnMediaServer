@@ -87,10 +87,16 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	protected DLNAResource parent;
 
 	/**
-	 * @deprecated Use standard getter and setter to access this variable.
+	 * @deprecated This variable will be removed. Use {@link #getFormat()} and
+	 * {@link #setFormat(Format)} instead.
 	 */
 	@Deprecated
 	protected Format ext;
+
+	/**
+	 * The format of this resource.
+	 */
+	private Format format;
 
 	/**
 	 * @deprecated Use standard getter and setter to access this variable.
@@ -119,13 +125,10 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	protected long lastmodified;
 
 	/**
-	 * @deprecated Use standard getter and setter to access this variable.
-	 *
 	 * Represents the transformation to be used to the file. If null, then
 	 * @see Player
 	 */
-	@Deprecated
-	protected Player player;
+	private Player player;
 
 	/**
 	 * @deprecated Use standard getter and setter to access this variable.
@@ -230,6 +233,8 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 */
 	@Deprecated
 	protected long lastRefreshTime;
+	
+	private String lastSearch;
 
 	/**
 	 * Returns parent object, usually a folder type of resource. In the DLDI
@@ -383,6 +388,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 		setSpecificType(Format.UNKNOWN);
 		setChildren(new ArrayList<DLNAResource>());
 		setUpdateId(1);
+		lastSearch = null;
 	}
 
 	public DLNAResource(int specificType) {
@@ -414,11 +420,11 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 *		if this DLNAResource is a container.
 	 */
 	public boolean isCompatible(RendererConfiguration renderer) {
-		return getExt() == null
-			|| getExt().isUnknown()
-			|| (getExt().isVideo() && renderer.isVideoSupported())
-			|| (getExt().isAudio() && renderer.isAudioSupported())
-			|| (getExt().isImage() && renderer.isImageSupported());
+		return getFormat() == null
+			|| getFormat().isUnknown()
+			|| (getFormat().isVideo() && renderer.isVideoSupported())
+			|| (getFormat().isAudio() && renderer.isAudioSupported())
+			|| (getFormat().isImage() && renderer.isImageSupported());
 	}
 
 	/**Adds a new DLNAResource to the child list. Only useful if this object is of the container type.<P>
@@ -465,60 +471,55 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 					}
 				}
 
-				if (child.getExt() != null) {
-					setSkipTranscode(child.getExt().skip(PMS.getConfiguration().getNoTranscode(), getDefaultRenderer() != null ? getDefaultRenderer().getStreamedExtensions() : null));
+				if (child.getFormat() != null) {
+					setSkipTranscode(child.getFormat().skip(PMS.getConfiguration().getNoTranscode(), getDefaultRenderer() != null ? getDefaultRenderer().getStreamedExtensions() : null));
 				}
 
-				if (child.getExt() != null && (child.getExt().transcodable() || parserV2) && (child.getMedia() == null || parserV2)) {
+				if (child.getFormat() != null && (child.getFormat().transcodable() || parserV2) && (child.getMedia() == null || parserV2)) {
 					if (!parserV2) {
 						child.setMedia(new DLNAMediaInfo());
 					}
 
 					// Try to determine a player to use for transcoding.
-					Player pl = null;
+					Player player = null;
 
-					if (child.getExt().getProfiles() != null && child.getExt().getProfiles().size() > 0) {
-						// First try to match a player based on the format profiles.
-						int i = 0;
+					// First, try to match a player based on the name of the DLNAResource
+					// or its parent. If the name ends in "[unique player id]", that player
+					// is preferred.
+					String name = getName();
 
-						while (pl == null && i < child.getExt().getProfiles().size()) {
-							pl = PlayerFactory.getPlayer(child.getExt().getProfiles().get(i), child.getExt());
-							i++;
-						}
+					for (Player p : PlayerFactory.getPlayers()) {
+						String end = "[" + p.id() + "]";
 
-						// Next, try to match a player based on the name of the DLNAResource.
-						// When a match is found it overrules the result of the first try.
-						String name = getName();
-
-						for (Class<? extends Player> clazz : child.getExt().getProfiles()) {
-							for (Player p : PlayerFactory.getPlayers()) {
-								if (p.getClass().equals(clazz)) {
-									String end = "[" + p.id() + "]";
-
-									if (name.endsWith(end)) {
-										nametruncate = name.lastIndexOf(end);
-										pl = p;
-										break;
-									} else if (getParent() != null && getParent().getName().endsWith(end)) {
-										getParent().nametruncate = getParent().getName().lastIndexOf(end);
-										pl = p;
-										break;
-									}
-								}
-							}
+						if (name.endsWith(end)) {
+							nametruncate = name.lastIndexOf(end);
+							player = p;
+							LOGGER.trace("Selecting player based on name end");
+							break;
+						} else if (getParent() != null && getParent().getName().endsWith(end)) {
+							getParent().nametruncate = getParent().getName().lastIndexOf(end);
+							player = p;
+							LOGGER.trace("Selecting player based on parent name end");
+							break;
 						}
 					}
 
-					if (pl != null && !allChildrenAreFolders) {
+					// If no preferred player could be determined from the name, try to
+					// match a player based on media information and format.
+					if (player == null) {
+						player = PlayerFactory.getPlayer(child);
+					}
+
+					if (player != null && !allChildrenAreFolders) {
 						boolean forceTranscode = false;
-						if (child.getExt() != null) {
-							forceTranscode = child.getExt().skip(PMS.getConfiguration().getForceTranscode(), getDefaultRenderer() != null ? getDefaultRenderer().getTranscodedExtensions() : null);
+						if (child.getFormat() != null) {
+							forceTranscode = child.getFormat().skip(PMS.getConfiguration().getForceTranscode(), getDefaultRenderer() != null ? getDefaultRenderer().getTranscodedExtensions() : null);
 						}
 
 						boolean hasEmbeddedSubs = false;
 
 						if (child.getMedia() != null) {
-							for (DLNAMediaSubtitle s : child.getMedia().getSubtitlesCodes()) {
+							for (DLNAMediaSubtitle s : child.getMedia().getSubtitleTracksList()) {
 								hasEmbeddedSubs = (hasEmbeddedSubs || s.isEmbedded());
 							}
 						}
@@ -531,7 +532,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 
 						boolean isIncompatible = false;
 
-						if (!child.getExt().isCompatible(child.getMedia(),getDefaultRenderer())) {
+						if (!child.getFormat().isCompatible(child.getMedia(),getDefaultRenderer())) {
 							isIncompatible = true;
 						}
 
@@ -541,23 +542,23 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 						// or 3- FFmpeg support and the file is not ps3 compatible (need to remove this ?) and no SkipTranscode extension forced by user
 						// or 4- There's some sub files or embedded subs to deal with and no SkipTranscode extension forced by user
 						if (forceTranscode || !isSkipTranscode() && (forceTranscodeV2 || isIncompatible || hasSubsToTranscode)) {
-							child.setPlayer(pl);
-							LOGGER.trace("Switching " + child.getName() + " to player " + pl.toString() + " for transcoding");
+							child.setPlayer(player);
+							LOGGER.trace("Switching " + child.getName() + " to player " + player.toString() + " for transcoding");
 						}
 
 						// Should the child be added to the transcode folder?
-						if (child.getExt().isVideo() && child.isTranscodeFolderAvailable()) {
+						if (child.getFormat().isVideo() && child.isTranscodeFolderAvailable()) {
 							vf = getTranscodeFolder(true);
 
 							if (vf != null) {
 								VirtualFolder fileFolder = new FileTranscodeVirtualFolder(child.getName(), null);
 
 								DLNAResource newChild = child.clone();
-								newChild.setPlayer(pl);
+								newChild.setPlayer(player);
 								newChild.setMedia(child.getMedia());
 								// newChild.original = child;
 								fileFolder.addChildInternal(newChild);
-								LOGGER.trace("Duplicate " + child.getName() + " with player: " + pl.toString());
+								LOGGER.trace("Duplicate " + child.getName() + " with player: " + player.toString());
 
 								vf.addChild(fileFolder);
 							}
@@ -572,19 +573,26 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 								}
 							}
 						}
-					} else if (!child.getExt().isCompatible(child.getMedia(),getDefaultRenderer()) && !child.isFolder()) {
+					} else if (!child.getFormat().isCompatible(child.getMedia(),getDefaultRenderer()) && !child.isFolder()) {
 						getChildren().remove(child);
 					}
 				}
 
-				if (child.getExt() != null && child.getExt().getSecondaryFormat() != null && child.getMedia() != null && getDefaultRenderer() != null && getDefaultRenderer().supportsFormat(child.getExt().getSecondaryFormat())) {
+				if (
+					child.getFormat() != null &&
+					child.getFormat().getSecondaryFormat() != null &&
+					child.getMedia() != null &&
+					getDefaultRenderer() != null &&
+					getDefaultRenderer().supportsFormat(child.getFormat().getSecondaryFormat())
+				) {
 					DLNAResource newChild = child.clone();
-					newChild.setExt(newChild.getExt().getSecondaryFormat());
+					newChild.setFormat(newChild.getFormat().getSecondaryFormat());
 					newChild.first = child;
 					child.second = newChild;
 
-					if (!newChild.getExt().isCompatible(newChild.getMedia(),getDefaultRenderer()) && newChild.getExt().getProfiles().size() > 0) {
-						newChild.setPlayer(PlayerFactory.getPlayer(newChild.getExt().getProfiles().get(0), newChild.getExt()));
+					if (!newChild.getFormat().isCompatible(newChild.getMedia(), getDefaultRenderer())) {
+						Player player = PlayerFactory.getPlayer(newChild);
+						newChild.setPlayer(player);
 					}
 					if (child.getMedia() != null && child.getMedia().isSecondaryFormatValid()) {
 						addChild(newChild);
@@ -654,18 +662,23 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 * @return List of DLNAResource items.
 	 * @throws IOException
 	 */
-	public synchronized List<DLNAResource> getDLNAResources(String objectId, boolean returnChildren, int start, int count, RendererConfiguration renderer) throws IOException {
+	public synchronized List<DLNAResource> getDLNAResources(String objectId, boolean children, int start, int count, RendererConfiguration renderer) throws IOException {
+		return getDLNAResources(objectId,children,start,count,renderer,null);
+	}
+	
+	public synchronized List<DLNAResource> getDLNAResources(String objectId, boolean returnChildren, int start, int count, RendererConfiguration renderer
+			,String searchStr) throws IOException {
 		ArrayList<DLNAResource> resources = new ArrayList<DLNAResource>();
-		DLNAResource resource = search(objectId, count, renderer);
+		DLNAResource resource = search(objectId, count, renderer, searchStr);
 
 		if (resource != null) {
 			resource.setDefaultRenderer(renderer);
 
 			if (!returnChildren) {
 				resources.add(resource);
-				resource.refreshChildrenIfNeeded();
+				resource.refreshChildrenIfNeeded(searchStr);
 			} else {
-				resource.discoverWithRenderer(renderer, count, true);
+				resource.discoverWithRenderer(renderer, count, true,searchStr);
 
 				if (count == 0) {
 					count = resource.getChildren().size();
@@ -698,12 +711,13 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 				}
 			}
 		}
+		lastSearch = searchStr;
 		return resources;
 	}
 
-	protected void refreshChildrenIfNeeded() {
-		if (isDiscovered() && isRefreshNeeded()) {
-			refreshChildren();
+	protected void refreshChildrenIfNeeded(String search) {
+		if (isDiscovered() && shouldRefresh(search)) {
+			refreshChildren(search);
 			notifyRefresh();
 		}
 	}
@@ -717,10 +731,19 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 		setSystemUpdateId(getSystemUpdateId() + 1);
 	}
 
-	final protected void discoverWithRenderer(RendererConfiguration renderer, int count, boolean forced) {
+	final protected void discoverWithRenderer(RendererConfiguration renderer, int count, boolean forced,
+			String searchStr) {
 		// Discovering if not already done.
 		if (!isDiscovered()) {
-			discoverChildren();
+			if (PMS.getConfiguration().getFolderLimit() && depthLimit()) {
+				if (renderer.getRendererName().equalsIgnoreCase("Playstation 3") || renderer.isXBOX()) {
+					LOGGER.info("Depth limit potentionally hit for " + getDisplayName());
+				}
+				if (defaultRenderer != null) {
+					defaultRenderer.addFolderLimit(this);
+				}
+			}
+			discoverChildren(searchStr);
 			boolean ready = true;
 			if (renderer.isMediaParserV2() && renderer.isDLNATreeHack()) {
 				ready = analyzeChildren(count);
@@ -735,17 +758,23 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 			// if forced, then call the old 'refreshChildren' method
 			LOGGER.trace("discover {} refresh forced: {}", getResourceId(), forced);
 			if (forced) {
-				if (refreshChildren()) {
+				if (refreshChildren(searchStr)) {
 					notifyRefresh();
 				}
 			} else {
 				// if not, then the regular isRefreshNeeded/doRefreshChildren pair.
-				if (isRefreshNeeded()) {
-					doRefreshChildren();
+				if (shouldRefresh(searchStr)) {
+					doRefreshChildren(searchStr);
 					notifyRefresh();
 				}
 			}
 		}
+	}
+	
+	private boolean shouldRefresh(String searchStr) {
+		return (searchStr == null && lastSearch != null) || 
+		(searchStr !=null && !searchStr.equals(lastSearch)) 
+		|| isRefreshNeeded();
 	}
 
 	@Override
@@ -766,16 +795,17 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 * @see #getId()
 	 *
 	 */
-	public DLNAResource search(String searchId, int count, RendererConfiguration renderer) {
+	public DLNAResource search(String searchId, int count, 
+							   RendererConfiguration renderer,String searchStr) {
 		if (getId() != null && searchId != null) {
 			String[] indexPath = searchId.split("\\$", 2);
 			if (getId().equals(indexPath[0])) {
 				if (indexPath.length == 1 || indexPath[1].length() == 0) {
 					return this;
 				} else {
-					discoverWithRenderer(renderer, count, false);
+					discoverWithRenderer(renderer, count, false, searchStr);
 					for (DLNAResource file : getChildren()) {
-						DLNAResource found = file.search(indexPath[1], count, renderer);
+						DLNAResource found = file.search(indexPath[1], count, renderer, searchStr);
 						if (found != null) {
 							return found;
 						}
@@ -793,6 +823,10 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 */
 	public void discoverChildren() {
 	}
+	
+	public void discoverChildren(String str) {
+		discoverChildren();
+	}
 
 	/**
 	 * TODO: (botijo) What is the intention of this function? Looks like a prototype to be overloaded.
@@ -807,6 +841,10 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 * Reload the list of children.
 	 */
 	public void doRefreshChildren() {
+	}
+	
+	public void doRefreshChildren(String search) {
+		doRefreshChildren();
 	}
 
 	/**
@@ -832,13 +870,21 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 		}
 		return false;
 	}
+	
+	public boolean refreshChildren(String search) {
+		if (shouldRefresh(search)) {
+			doRefreshChildren(search);
+			return true;
+		}
+		return false;
+	}
 
 	protected void checktype() {
-		if (getExt() == null) {
-			setExt(FormatFactory.getAssociatedExtension(getSystemName()));
+		if (getFormat() == null) {
+			setFormat(FormatFactory.getAssociatedExtension(getSystemName()));
 		}
-		if (getExt() != null && getExt().isUnknown()) {
-			getExt().setType(getSpecificType());
+		if (getFormat() != null && getFormat().isUnknown()) {
+			getFormat().setType(getSpecificType());
 		}
 	}
 
@@ -904,7 +950,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 		}
 
 		if (getMediaSubtitle() != null && getMediaSubtitle().getId() != -1) {
-			name += " {Sub: " + getMediaSubtitle().getSubType() + "/" + getMediaSubtitle().getLangFullName() + ((getMediaSubtitle().getFlavor() != null && mediaRenderer != null && mediaRenderer.isShowSubMetadata()) ? (" (" + getMediaSubtitle().getFlavor() + ")") : "") + "}";
+			name += " {Sub: " + getMediaSubtitle().getType().getDescription() + "/" + getMediaSubtitle().getLangFullName() + ((getMediaSubtitle().getFlavor() != null && mediaRenderer != null && mediaRenderer.isShowSubMetadata()) ? (" (" + getMediaSubtitle().getFlavor() + ")") : "") + "}";
 		}
 
 		if (isAvisynth()) {
@@ -1076,14 +1122,18 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 			}
 			for (int c = 0; c < indexCount; c++) {
 				openTag(sb, "res");
-				// DLNA.ORG_OP : 1er 10 = exemple: TimeSeekRange.dlna.org :npt=187.000-
-				//                   01 = Range par octets
-				//                   00 = pas de range, meme pas de pause possible
+
+				/*
+				 * DLNA.ORG_OP : 1er 10 = exemple: TimeSeekRange.dlna.org :npt=187.000-
+				 *                   01 = Range par octets
+				 *                   00 = pas de range, meme pas de pause possible
+				 */ 
 				flags = "DLNA.ORG_OP=01";
 				if (getPlayer() != null) {
 					if (getPlayer().isTimeSeekable() && mediaRenderer.isSeekByTime()) {
-						if (mediaRenderer.isPS3()) // ps3 doesn't like OP=11
-						{
+
+						// PS3 doesn't like OP=11
+						if (mediaRenderer.isPS3()) {
 							flags = "DLNA.ORG_OP=10";
 						} else {
 							flags = "DLNA.ORG_OP=11";
@@ -1100,7 +1150,10 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 				if (mime == null) {
 					mime = "video/mpeg";
 				}
-				if (mediaRenderer.isPS3()) { // XXX TO REMOVE, OR AT LEAST MAKE THIS GENERIC // whole extensions/mime-types mess to rethink anyway
+
+				// TODO: Remove, or at least make this generic
+				// Whole extensions/mime-types mess to rethink anyway
+				if (mediaRenderer.isPS3()) {
 					if (mime.equals("video/x-divx")) {
 						dlnaspec = "DLNA.ORG_PN=AVI";
 					} else if (mime.equals("video/x-ms-wmv") && getMedia() != null && getMedia().getHeight() > 700) {
@@ -1109,9 +1162,9 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 				} else {
 					if (mime.equals("video/mpeg")) {
 						if (getPlayer() != null) {
-							// do we have some mpegts to offer ?
+							// Do we have some mpegts to offer?
 							boolean mpegTsMux = TSMuxerVideo.ID.equals(getPlayer().id()) || VideoLanVideoStreaming.ID.equals(getPlayer().id());
-							if (!mpegTsMux) { // maybe, like the ps3, mencoder can launch tsmuxer if this a compatible H264 video
+							if (!mpegTsMux) { // Maybe, like the PS3, MEncoder can launch tsMuxeR if this a compatible H264 video
 								mpegTsMux = MEncoderVideo.ID.equals(getPlayer().id()) && ((getMediaSubtitle() == null && getMedia() != null && getMedia().getDvdtrack() == 0 && getMedia().isMuxable(mediaRenderer)
 									&& PMS.getConfiguration().isMencoderMuxWhenCompatible() && mediaRenderer.isMuxH264MpegTS())
 									|| mediaRenderer.isTranscodeToMPEGTSAC3());
@@ -1152,8 +1205,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 
 				addAttribute(sb, "protocolInfo", "http-get:*:" + mime + ":" + (dlnaspec != null ? (dlnaspec + ";") : "") + flags);
 
-
-				if (getExt() != null && getExt().isVideo() && getMedia() != null && getMedia().isMediaparsed()) {
+				if (getFormat() != null && getFormat().isVideo() && getMedia() != null && getMedia().isMediaparsed()) {
 					if (getPlayer() == null && getMedia() != null) {
 						addAttribute(sb, "size", getMedia().getSize());
 					} else {
@@ -1174,14 +1226,14 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 					}
 					addAttribute(sb, "bitrate", getMedia().getRealVideoBitrate());
 					if (firstAudioTrack != null) {
-						if (firstAudioTrack.getNrAudioChannels() > 0) {
-							addAttribute(sb, "nrAudioChannels", firstAudioTrack.getNrAudioChannels());
+						if (firstAudioTrack.getAudioProperties().getNumberOfChannels() > 0) {
+							addAttribute(sb, "nrAudioChannels", firstAudioTrack.getAudioProperties().getNumberOfChannels());
 						}
 						if (firstAudioTrack.getSampleFrequency() != null) {
 							addAttribute(sb, "sampleFrequency", firstAudioTrack.getSampleFrequency());
 						}
 					}
-				} else if (getExt() != null && getExt().isImage()) {
+				} else if (getFormat() != null && getFormat().isImage()) {
 					if (getMedia() != null && getMedia().isMediaparsed()) {
 						addAttribute(sb, "size", getMedia().getSize());
 						if (getMedia().getResolution() != null) {
@@ -1190,7 +1242,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 					} else {
 						addAttribute(sb, "size", length());
 					}
-				} else if (getExt() != null && getExt().isAudio()) {
+				} else if (getFormat() != null && getFormat().isAudio()) {
 					if (getMedia() != null && getMedia().isMediaparsed()) {
 						addAttribute(sb, "bitrate", getMedia().getBitrate());
 						if (getMedia().getDuration() != null) {
@@ -1200,7 +1252,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 							addAttribute(sb, "sampleFrequency", firstAudioTrack.getSampleFrequency());
 						}
 						if (firstAudioTrack != null) {
-							addAttribute(sb, "nrAudioChannels", firstAudioTrack.getNrAudioChannels());
+							addAttribute(sb, "nrAudioChannels", firstAudioTrack.getAudioProperties().getNumberOfChannels());
 						}
 
 						if (getPlayer() == null) {
@@ -1217,7 +1269,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 										LOGGER.debug("Caught exception", e);
 									}
 								}
-								int na = firstAudioTrack.getNrAudioChannels();
+								int na = firstAudioTrack.getAudioProperties().getNumberOfChannels();
 								if (na > 2) // no 5.1 dump in mplayer
 								{
 									na = 2;
@@ -1242,7 +1294,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 		}
 
 		String thumbURL = getThumbnailURL();
-		if (!isFolder() && (getExt() == null || (getExt() != null && thumbURL != null))) {
+		if (!isFolder() && (getFormat() == null || (getFormat() != null && thumbURL != null))) {
 			openTag(sb, "upnp:albumArtURI");
 			addAttribute(sb, "xmlns:dlna", "urn:schemas-dlna-org:metadata-1-0/");
 
@@ -1289,11 +1341,11 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 				} else if (xbox && getFakeParentId() != null && getFakeParentId().equals("F")) {
 					uclass = "object.container.playlistContainer";
 				}
-			} else if (getExt() != null && getExt().isVideo()) {
+			} else if (getFormat() != null && getFormat().isVideo()) {
 				uclass = "object.item.videoItem";
-			} else if (getExt() != null && getExt().isImage()) {
+			} else if (getFormat() != null && getFormat().isImage()) {
 				uclass = "object.item.imageItem.photo";
-			} else if (getExt() != null && getExt().isAudio()) {
+			} else if (getFormat() != null && getFormat().isAudio()) {
 				uclass = "object.item.audioItem.musicTrack";
 			} else {
 				uclass = "object.item.videoItem";
@@ -1474,7 +1526,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 			}
 
 			InputStream fis = null;
-			if (getExt() != null && getExt().isImage() && getMedia() != null && getMedia().getOrientation() > 1 && mediarenderer.isAutoRotateBasedOnExif()) {
+			if (getFormat() != null && getFormat().isImage() && getMedia() != null && getMedia().getOrientation() > 1 && mediarenderer.isAutoRotateBasedOnExif()) {
 				// seems it's a jpeg file with an orientation setting to take care of
 				fis = ImagesUtil.getAutoRotateInputStreamImage(getInputStream(), getMedia().getOrientation());
 				if (fis == null) // error, let's return the original one
@@ -1617,8 +1669,8 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 			return getPlayer().mimeType();
 		} else if (getMedia() != null && getMedia().isMediaparsed()) {
 			return getMedia().getMimeType();
-		} else if (getExt() != null) {
-			return getExt().mimeType();
+		} else if (getFormat() != null) {
+			return getFormat().mimeType();
 		} else {
 			return getDefaultMimeType(getSpecificType());
 		}
@@ -1637,7 +1689,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	protected void checkThumbnail(InputFile input) {
 		if (getMedia() != null && !getMedia().isThumbready() && PMS.getConfiguration().isThumbnailGenerationEnabled()) {
 			getMedia().setThumbready(true);
-			getMedia().generateThumbnail(input, getExt(), getType());
+			getMedia().generateThumbnail(input, getFormat(), getType());
 			if (getMedia().getThumb() != null && PMS.getConfiguration().getUseCache() && input.getFile() != null) {
 				PMS.get().getDatabase().updateThumbnail(input.getFile().getAbsolutePath(), input.getFile().lastModified(), getType(), getMedia());
 			}
@@ -1659,8 +1711,8 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	}
 
 	public int getType() {
-		if (getExt() != null) {
-			return getExt().getType();
+		if (getFormat() != null) {
+			return getFormat().getType();
 		} else {
 			return Format.UNKNOWN;
 		}
@@ -1681,7 +1733,7 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 */
 	@Override
 	public String toString() {
-		return this.getClass().getSimpleName() + " [id=" + getId() + ", name=" + getName() + ", full path=" + getResourceId() + ", ext=" + getExt() + ", discovered=" + isDiscovered() + "]";
+		return this.getClass().getSimpleName() + " [id=" + getId() + ", name=" + getName() + ", full path=" + getResourceId() + ", ext=" + getFormat() + ", discovered=" + isDiscovered() + "]";
 	}
 
 	/**
@@ -1706,17 +1758,40 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 *
 	 * @return The format of this resource.
 	 */
-	public Format getExt() {
-		return ext;
+	public Format getFormat() {
+		return format;
 	}
 
 	/**
 	 * Sets the {@link Format} of this resource, thereby defining its capabilities.
 	 *
-	 * @param ext The format to set.
+	 * @param format The format to set.
 	 */
-	protected void setExt(Format ext) {
-		this.ext = ext;
+	protected void setFormat(Format format) {
+		this.format = format;
+
+		// Set deprecated variable for backwards compatibility
+		ext = format;
+	}
+
+	/**
+	 * @deprecated Use {@link #getFormat()} instead.
+	 *
+	 * @return The format of this resource.
+	 */
+	@Deprecated
+	public Format getExt() {
+		return getFormat();
+	}
+
+	/**
+	 * @deprecated Use {@link #setFormat(Format)} instead.
+	 *
+	 * @param format The format to set.
+	 */
+	@Deprecated
+	protected void setExt(Format format) {
+		setFormat(format);
 	}
 
 	/**
@@ -1742,18 +1817,20 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 
 	/**
 	 * Returns the {@link DLNAMediaAudio} object for this resource that contains
-	 * the audio specifics.
+	 * the audio specifics. A resource can have many audio tracks, this method
+	 * returns the one that should be played.
 	 *
 	 * @return The audio object containing detailed information.
 	 * @since 1.50
 	 */
-	protected DLNAMediaAudio getMediaAudio() {
+	public DLNAMediaAudio getMediaAudio() {
 		return media_audio;
 	}
 
 	/**
 	 * Sets the {@link DLNAMediaAudio} object for this resource that contains
-	 * the audio specifics.
+	 * the audio specifics. A resource can have many audio tracks, this method
+	 * determines the one that should be played.
 	 *
 	 * @param mediaAudio The audio object containing detailed information.
 	 * @since 1.50
@@ -1764,18 +1841,20 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 
 	/**
 	 * Returns the {@link DLNAMediaSubtitle} object for this resource that
-	 * contains the specifics for the subtitles.
+	 * contains the specifics for the subtitles. A resource can have many
+	 * subtitles, this method returns the one that should be displayed.
 	 *
 	 * @return The subtitle object containing detailed information.
 	 * @since 1.50
 	 */
-	protected DLNAMediaSubtitle getMediaSubtitle() {
+	public DLNAMediaSubtitle getMediaSubtitle() {
 		return media_subtitle;
 	}
 
 	/**
 	 * Sets the {@link DLNAMediaSubtitle} object for this resource that
-	 * contains the specifics for the subtitles.
+	 * contains the specifics for the subtitles. A resource can have many
+	 * subtitles, this method determines the one that should be used.
 	 *
 	 * @param mediaSubtitle The subtitle object containing detailed information.
 	 * @since 1.50
@@ -1920,7 +1999,11 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	}
 
 	/**
-	 * Sets whether or not this is a nameless resource.
+	 * Sets whether or not this is a nameless resource. This is particularly
+	 * useful in the virtual TRANSCODE folder for a file, where the same file
+	 * is copied many times with different audio and subtitle settings. In that
+	 * case the name of the file becomes irrelevant and only the settings
+	 * need to be shown.
 	 *
 	 * @param noName Set to true if the resource is nameless.
 	 * @since 1.50
@@ -2085,6 +2168,22 @@ public abstract class DLNAResource extends HTTPResource implements Cloneable, Ru
 	 */
 	protected void setLastRefreshTime(long lastRefreshTime) {
 		this.lastRefreshTime = lastRefreshTime;
+	}
+
+	private static final int DEPTH_WARNING_LIMIT=7;
+
+	private boolean depthLimit() {
+		DLNAResource tmp = this;
+		int depth = 0;
+		while (tmp != null) {
+			tmp = tmp.getParent();
+			depth++;
+		}
+		return (depth > DEPTH_WARNING_LIMIT);
+	}
+	
+	public boolean isSearched() {
+		return false;
 	}
 }
 

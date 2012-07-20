@@ -27,6 +27,7 @@ import java.util.List;
 import net.pms.PMS;
 import net.pms.configuration.RendererConfiguration;
 import net.pms.formats.FormatFactory;
+import net.pms.formats.v2.SubtitleType;
 import net.pms.io.OutputParams;
 import net.pms.io.ProcessWrapperImpl;
 import net.pms.util.FileUtil;
@@ -101,9 +102,9 @@ public class DVDISOTitle extends DLNAResource {
 					}
 					lang.setCodecA(line.substring(line.indexOf("format: ") + 8, end).trim());
 					if (line.contains("(stereo)")) {
-						lang.setNrAudioChannels(2);
+						lang.getAudioProperties().setNumberOfChannels(2);
 					} else {
-						lang.setNrAudioChannels(6);
+						lang.getAudioProperties().setNumberOfChannels(6);
 					}
 					audio.add(lang);
 				}
@@ -114,7 +115,7 @@ public class DVDISOTitle extends DLNAResource {
 					if (lang.getLang().equals("unknown")) {
 						lang.setLang(DLNAMediaLang.UND);
 					}
-					lang.setType(DLNAMediaSubtitle.EMBEDDED);
+					lang.setType(SubtitleType.UNKNOWN);
 					subs.add(lang);
 				}
 				if (line.startsWith("ID_VIDEO_WIDTH=")) {
@@ -185,8 +186,8 @@ public class DVDISOTitle extends DLNAResource {
 			d = Double.parseDouble(duration);
 		}
 
-		getMedia().setAudioCodes(audio);
-		getMedia().setSubtitlesCodes(subs);
+		getMedia().setAudioTracksList(audio);
+		getMedia().setSubtitleTracksList(subs);
 
 		if (duration != null) {
 			getMedia().setDuration(d);
@@ -246,8 +247,8 @@ public class DVDISOTitle extends DLNAResource {
 
 	@Override
 	public boolean isValid() {
-		if (getExt() == null) {
-			setExt(FormatFactory.getAssociatedExtension("dummy.iso"));
+		if (getFormat() == null) {
+			setFormat(FormatFactory.getAssociatedExtension("dummy.iso"));
 		}
 		return true;
 	}

@@ -32,6 +32,8 @@ import javax.swing.*;
 import net.pms.Messages;
 import net.pms.PMS;
 import net.pms.configuration.PmsConfiguration;
+import net.pms.dlna.DLNAResource;
+import net.pms.formats.Format;
 
 public class MEncoderAviSynth extends MEncoderVideo {
 	public MEncoderAviSynth(PmsConfiguration configuration) {
@@ -61,7 +63,7 @@ public class MEncoderAviSynth extends MEncoderVideo {
 		cmp = (JComponent) cmp.getComponent(0);
 		cmp.setFont(cmp.getFont().deriveFont(Font.BOLD));
 
-		multithreading = new JCheckBox(Messages.getString("MEncoderAviSynth.14"));
+		multithreading = new JCheckBox(Messages.getString("MEncoderVideo.35"));
 		multithreading.setContentAreaFilled(false);
 		if (PMS.getConfiguration().getAvisynthMultiThreading()) {
 			multithreading.setSelected(true);
@@ -208,5 +210,28 @@ public class MEncoderAviSynth extends MEncoderVideo {
 	@Override
 	public String name() {
 		return "AviSynth/MEncoder";
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.VIDEO) {
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.MKV)
+					|| id.equals(Format.Identifier.MPG)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

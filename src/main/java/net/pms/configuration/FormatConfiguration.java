@@ -6,7 +6,7 @@ import java.util.regex.PatternSyntaxException;
 import net.pms.dlna.DLNAMediaAudio;
 import net.pms.dlna.DLNAMediaInfo;
 import net.pms.dlna.InputFile;
-import net.pms.dlna.MediaInfoParser;
+import net.pms.dlna.LibMediaInfoParser;
 import net.pms.formats.Format;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +21,7 @@ public class FormatConfiguration {
 	public static final String MP4 = "mp4";
 	public static final String MOV = "mov";
 	public static final String FLV = "flv";
+	public static final String WEBM = "WebM";
 	public static final String RM = "rm";
 	public static final String MATROSKA = "mkv";
 	public static final String WAV = "wav";
@@ -77,7 +78,7 @@ public class FormatConfiguration {
 			if (force_v1) {
 				media.parse(file, ext, type, false);
 			} else {
-				MediaInfoParser.parse(media, file, type);
+				LibMediaInfoParser.parse(media, file, type);
 			}
 		} else {
 			media.parse(file, ext, type, false);
@@ -316,8 +317,8 @@ public class FormatConfiguration {
 			return match(media.getContainer(), media.getCodecV(), null, 0, 0, media.getBitrate(), media.getWidth(), media.getHeight(), media.getExtras());
 		} else {
 			String finalMimeType = null;
-			for (DLNAMediaAudio audio : media.getAudioCodes()) {
-				String mimeType = match(media.getContainer(), media.getCodecV(), audio.getCodecA(), audio.getNrAudioChannels(), audio.getSampleRate(), media.getBitrate(), media.getWidth(), media.getHeight(), media.getExtras());
+			for (DLNAMediaAudio audio : media.getAudioTracksList()) {
+				String mimeType = match(media.getContainer(), media.getCodecV(), audio.getCodecA(), audio.getAudioProperties().getNumberOfChannels(), audio.getSampleRate(), media.getBitrate(), media.getWidth(), media.getHeight(), media.getExtras());
 				finalMimeType = mimeType;
 				if (mimeType == null) // if at least one audio track is not compatible, the file must be transcoded.
 				{

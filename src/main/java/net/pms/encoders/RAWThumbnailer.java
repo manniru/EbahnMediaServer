@@ -115,4 +115,31 @@ public class RAWThumbnailer extends Player {
 		baos.close();
 		return b;
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.AUDIO) {
+			return false;
+		}
+
+		if (resource.getMediaSubtitle() != null) {
+			// PMS does not support FFmpeg subtitles at the moment.
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.RAW)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }

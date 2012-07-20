@@ -48,6 +48,7 @@ public class RootFolder extends DLNAResource {
 	private static final Logger LOGGER = LoggerFactory.getLogger(RootFolder.class);
 	private final PmsConfiguration configuration = PMS.getConfiguration();
 	private boolean running;
+	private FolderLimit lim;
 
 	public RootFolder() {
 		setIndexId(0);
@@ -85,8 +86,13 @@ public class RootFolder extends DLNAResource {
 
 	@Override
 	public void discoverChildren() {
-		if(isDiscovered()) {
+		if (isDiscovered()) {
 			return;
+		}
+		
+		if (configuration.getFolderLimit()) {
+			lim = new FolderLimit();
+			addChild(lim);
 		}
 
 		for (DLNAResource r : getConfiguredFolders()) {
@@ -95,6 +101,12 @@ public class RootFolder extends DLNAResource {
 		for (DLNAResource r : getVirtualFolders()) {
 			addChild(r);
 		}
+		
+		if (configuration.getSearchFolder()) {
+			SearchFolder sf = new SearchFolder("Search disc folders", new FileSearch(getConfiguredFolders()));
+			addChild(sf);
+		}
+		
 		File webConf = new File(configuration.getProfileDirectory(), "WEB.conf");
 		if (webConf.exists()) {
 			addWebFolder(webConf);
@@ -135,6 +147,12 @@ public class RootFolder extends DLNAResource {
 		setDiscovered(true);
 	}
 
+	public void setFolderLim(DLNAResource r) {
+		if (lim != null) {
+			lim.setStart(r);
+		}
+	}
+
 	/**
 	 * Returns whether or not a scan is running.
 	 *
@@ -158,7 +176,7 @@ public class RootFolder extends DLNAResource {
 	public void scan() {
 		setRunning(true);
 
-		if(!isDiscovered()) {
+		if (!isDiscovered()) {
 			discoverChildren();
 		}
 		setDefaultRenderer(RendererConfiguration.getDefaultConf());
@@ -223,10 +241,11 @@ public class RootFolder extends DLNAResource {
 	private List<DLNAResource> getVirtualFolders() {
 		List<DLNAResource> res = new ArrayList<DLNAResource>();
 		List<MapFileConfiguration> mapFileConfs = MapFileConfiguration.parse(configuration.getVirtualFolders());
-		if (mapFileConfs != null)
+		if (mapFileConfs != null) {
 			for (MapFileConfiguration f : mapFileConfs) {
 				res.add(new MapFile(f));
 			}
+		}
 		return res;
 	}
 
@@ -816,5 +835,9 @@ public class RootFolder extends DLNAResource {
 	@Override
 	public String toString() {
 		return "RootFolder[" + getChildren() + "]";
+	}
+	
+	public void reset() {
+		setDiscovered(false);
 	}
 } 

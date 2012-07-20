@@ -22,19 +22,27 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.MalformedURLException;
 import java.net.Socket;
+import java.net.URL;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 import net.pms.PMS;
 import net.pms.configuration.RendererConfiguration;
+import net.pms.dlna.DLNAMediaAudio;
 import net.pms.dlna.DLNAMediaInfo;
 import net.pms.dlna.DLNAMediaSubtitle;
 import net.pms.dlna.DLNAResource;
 import net.pms.dlna.Range;
 import net.pms.external.StartStopListenerDelegate;
 import org.apache.commons.lang.StringUtils;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class Request extends HTTPResource {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Request.class);
@@ -214,12 +222,12 @@ public class Request extends HTTPResource {
 					// This is a request for a subtitle file
 					output(output, "Content-Type: text/plain");
 					output(output, "Expires: " + getFUTUREDATE() + " GMT");
-					List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitlesCodes();
+					List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitleTracksList();
 
 					if (subs != null && !subs.isEmpty()) {
 						// TODO: maybe loop subs to get the requested subtitle type instead of using the first one
 						DLNAMediaSubtitle sub = subs.get(0);
-						inputStream = new java.io.FileInputStream(sub.getFile());
+						inputStream = new java.io.FileInputStream(sub.getExternalFile());
 					}
 				} else {
 					// This is a request for a regular file.
@@ -237,20 +245,23 @@ public class Request extends HTTPResource {
 
 						if (subtitleHttpHeader != null && !"".equals(subtitleHttpHeader)) {
 							// Device allows a custom subtitle HTTP header; construct it
-							List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitlesCodes();
+							List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitleTracksList();
 
 							if (subs != null && !subs.isEmpty()) {
 								DLNAMediaSubtitle sub = subs.get(0);
 
-								int type = sub.getType();
-
-								if (type < DLNAMediaSubtitle.subExtensions.length) {
-									String strType = DLNAMediaSubtitle.subExtensions[type - 1];
-									String subtitleUrl = "http://" + PMS.get().getServer().getHost() +
+								String subtitleUrl;
+								String subExtension = sub.getType().getExtension();
+								if (isNotBlank(subExtension)) {
+									subtitleUrl = "http://" + PMS.get().getServer().getHost() +
+										':' + PMS.get().getServer().getPort() + "/get/" +
+										id + "/subtitle0000." + subExtension;
+								} else {
+									subtitleUrl = "http://" + PMS.get().getServer().getHost() +
 											':' + PMS.get().getServer().getPort() + "/get/" +
-											id + "/subtitle0000." + strType;
-									output(output, subtitleHttpHeader + ": " + subtitleUrl);
+											id + "/subtitle0000";
 								}
+								output(output, subtitleHttpHeader + ": " + subtitleUrl);
 							}
 						}
 
@@ -400,29 +411,34 @@ public class Request extends HTTPResource {
 			if (soapaction == null) { //ignore this
 				return;
 			}
-			String uuid="uuid:" + UUID.randomUUID().toString();
 			output(output, CONTENT_TYPE_UTF8);
-			output(output,"Content-Length: 0");
-			output(output,"Connection: close");
-			output(output,"SID: "+uuid);
-			output(output,"Server: "+PMS.get().getServerName());
-			output(output,"Timeout: Second-1800");
-			output(output,"");
+			output(output, "Content-Length: 0");
+			output(output, "Connection: close");
+			output(output, "SID: " + PMS.get().usn());
+			output(output, "Server: " + PMS.get().getServerName());
+			output(output, "Timeout: Second-1800");
+			output(output, "");
 			output.flush();
-			//output.close();
+
 			String cb = soapaction.replace("<", "").replace(">", "");
-			String faddr = cb.replace("http://", "").replace("/", "");
-			String addr = faddr.split(":")[0];
-			int port = Integer.parseInt(faddr.split(":")[1]);
-			Socket sock = new Socket(addr,port);
-			OutputStream out = sock.getOutputStream();
-			output(out, "NOTIFY /" + argument + " HTTP/1.1");
-			output(out, "SID: " + uuid);
-			output(out, "SEQ: " + 0);
-			output(out, "NT: upnp:event");
-			output(out, "NTS: upnp:propchange");
-			output(out, "HOST: " + faddr);
-			output(out, CONTENT_TYPE_UTF8);
+
+			try {
+				URL soapActionUrl = new URL(cb);
+				String addr = soapActionUrl.getHost();
+				int port = soapActionUrl.getPort();
+				Socket sock = new Socket(addr,port);
+				OutputStream out = sock.getOutputStream();
+
+				output(out, "NOTIFY /" + argument + " HTTP/1.1");
+				output(out, "SID: " + PMS.get().usn());
+				output(out, "SEQ: " + 0);
+				output(out, "NT: upnp:event");
+				output(out, "NTS: upnp:propchange");
+				output(out, "HOST: " + addr + ":" + port);
+				output(out, CONTENT_TYPE_UTF8);
+			} catch (MalformedURLException ex) {
+				LOGGER.debug("Cannot parse address and port from soap action \"" + soapaction + "\"", ex);
+			}
 			if (argument.contains("connection_manager")) {
 				response.append(HTTPXMLHelper.eventHeader("urn:schemas-upnp-org:service:ConnectionManager:1"));
 				response.append(HTTPXMLHelper.eventProp("SinkProtocolInfo"));
@@ -483,7 +499,7 @@ public class Request extends HTTPResource {
 				//LOGGER.trace(content);
 				objectID = getEnclosingValue(content, "<ObjectID>", "</ObjectID>");
 				String containerID = null;
-				if ((objectID == null || objectID.length() == 0) && xbox) {
+				if ((objectID == null || objectID.length() == 0) /*&& xbox*/) {
 					containerID = getEnclosingValue(content, "<ContainerID>", "</ContainerID>");
 					if (!containerID.contains("$")) {
 						objectID = "0";
@@ -541,16 +557,37 @@ public class Request extends HTTPResource {
 						}
 					}
 				}
+				else if (soapaction.contains("ContentDirectory:1#Search")) 
+					searchCriteria=getEnclosingValue(content,"<SearchCriteria>","</SearchCriteria>");
 
-				List<DLNAResource> files = PMS.get().getRootFolder(mediaRenderer).getDLNAResources(objectID, browseFlag != null && browseFlag.equals("BrowseDirectChildren"), startingIndex, requestCount, mediaRenderer);
+
+				List<DLNAResource> files = PMS.get().getRootFolder(mediaRenderer).getDLNAResources(objectID, browseFlag != null && browseFlag.equals("BrowseDirectChildren"), startingIndex, requestCount, mediaRenderer
+																								   ,searchCriteria);
 				if (searchCriteria != null && files != null) {
-					for (int i = files.size() - 1; i >= 0; i--) {
-						if (!files.get(i).getName().equals(searchCriteria)) {
+					searchCriteria = searchCriteria.toLowerCase();
+					for(int i = files.size() - 1; i >= 0; i--) {
+						DLNAResource res = files.get(i);
+						if(res.isSearched()) {
+							continue;
+						}
+						boolean keep = res.getName().toLowerCase().indexOf(searchCriteria) != -1;
+						final DLNAMediaInfo media = res.getMedia();
+						if(media!=null) {
+							for(int j = 0;j < media.getAudioTracksList().size(); j++) {
+								DLNAMediaAudio audio = media.getAudioTracksList().get(j);
+								keep |= audio.getAlbum().toLowerCase().indexOf(searchCriteria) != -1;
+								keep |= audio.getArtist().toLowerCase().indexOf(searchCriteria) != -1;
+								keep |= audio.getSongname().toLowerCase().indexOf(searchCriteria) != -1;
+							}
+						}
+						if(!keep) { // dump it
 							files.remove(i);
 						}
 					}
-					if (files.size() > 0) {
-						files = files.get(0).getChildren();
+					if(xbox) {
+						if (files.size() > 0) {
+							files = files.get(0).getChildren();
+						}
 					}
 				}
 

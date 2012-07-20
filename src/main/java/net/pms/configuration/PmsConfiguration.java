@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
-import net.pms.Messages;
 import net.pms.io.SystemUtils;
 import net.pms.util.PropertiesUtil;
 import org.apache.commons.configuration.Configuration;
@@ -50,7 +49,7 @@ public class PmsConfiguration {
 	private static final int DEFAULT_SERVER_PORT = 5001;
 
 	// MEncoder has a hardwired maximum of 16 threads for -lavcopts and -lavdopts
-	private static final int MENCODER_MAX_THREADS = 16;
+	private static final int MENCODER_MAX_THREADS = 8;
 
 	private static final String KEY_ALTERNATE_SUBS_FOLDER = "alternate_subs_folder";
 	private static final String KEY_ALTERNATE_THUMB_FOLDER = "alternate_thumb_folder";
@@ -77,6 +76,9 @@ public class PmsConfiguration {
 	private static final String KEY_ENGINES = "engines";
 	private static final String KEY_FFMPEG_ALTERNATIVE_PATH = "alternativeffmpegpath";
 	private static final String KEY_FFMPEG_SETTINGS = "ffmpeg";
+	private static final String KEY_FFMPEG_MULTITHREADING = "ffmpeg_multithreading";
+	private static final String KEY_FFMPEG_AVISYNTH_SETTINGS = "ffmpeg_avisynth";
+	private static final String KEY_FFMPEG_AVISYNTH_MULTITHREADING = "ffmpeg_avisynth_multithreading";
 	private static final String KEY_FIX_25FPS_AV_MISMATCH = "fix_25fps_av_mismatch";
 	private static final String KEY_FORCETRANSCODE = "forcetranscode";
 	private static final String KEY_FOLDER_LIMIT="folder_limit";
@@ -173,6 +175,9 @@ public class PmsConfiguration {
 	private static final String KEY_VIDEOTRANSCODE_START_DELAY = "key_videotranscode_start_delay";
 	private static final String KEY_VIRTUAL_FOLDERS = "vfolders";
 	private static final String KEY_BUFFER_MAX = "buffer_max";
+	private static final String KEY_PLUGIN_PURGE_ACTION = "plugin_purge";
+	private static final String KEY_SEARCH_FOLDER = "search_folder";
+	private static final String KEY_SEARCH_RECURSE = "search_recurse";
 
 	// the name of the subdirectory under which PMS config files are stored for this build (default: PMS).
 	// see Build for more details
@@ -349,8 +354,8 @@ public class PmsConfiguration {
 	 * Default constructor that will attempt to load the PMS configuration file
 	 * from the profile path.
 	 *
-	 * @throws ConfigurationException
-	 * @throws IOException
+	 * @throws org.apache.commons.configuration.ConfigurationException
+	 * @throws java.io.IOException
 	 */
 	public PmsConfiguration() throws ConfigurationException, IOException {
 		this(true);
@@ -362,8 +367,8 @@ public class PmsConfiguration {
 	 * @param loadFile Set to true to attempt to load the PMS configuration
 	 * 					file from the profile path. Set to false to skip
 	 * 					loading.
-	 * @throws ConfigurationException
-	 * @throws IOException
+	 * @throws org.apache.commons.configuration.ConfigurationException
+	 * @throws java.io.IOException
 	 */
 	public PmsConfiguration(boolean loadFile) throws ConfigurationException, IOException {
 		configuration = new PropertiesConfiguration();
@@ -627,6 +632,9 @@ public class PmsConfiguration {
 		String value = configuration.getString(key, def);
 		if (value != null) {
 			value = value.trim();
+		}
+		if ("".equals(value)) {
+			return def;
 		}
 		return value;
 	}
@@ -940,7 +948,8 @@ public class PmsConfiguration {
 	/**
 	 * Returns the audio language priority for MEncoder as a comma separated
 	 * string. For example: <code>"eng,fre,jpn,ger,und"</code>, where "und"
-	 * stands for "undefined".
+	 * stands for "undefined". Default value is "loc,eng,fre,jpn,ger,und".
+	 *
 	 * @return The audio language priority string.
 	 */
 	public String getMencoderAudioLanguages() {
@@ -949,7 +958,7 @@ public class PmsConfiguration {
 
 	/**
 	 * Returns a string of comma separated audio or subtitle languages,
-	 * ordered by priority. 
+	 * ordered by priority.
 	 * @return The string of languages.
 	 */
 	private String getDefaultLanguages() {
@@ -961,9 +970,11 @@ public class PmsConfiguration {
 	}
 
 	/**
-	 * Returns the subtitle language priority for MEncoder as a comma
-	 * separated string. For example: <code>"eng,fre,jpn,ger,und"</code>,
-	 * where "und" stands for "undefined".
+	 * Returns the subtitle language priority for MEncoder as a comma separated
+	 * string. For example: <code>"loc,eng,fre,jpn,ger,und"</code>, where "loc"
+	 * stands for the preferred local language and "und" stands for "undefined".
+	 * Default value is "loc,eng,fre,jpn,ger,und".
+	 *
 	 * @return The subtitle language priority string.
 	 */
 	public String getMencoderSubLanguages() {
@@ -993,9 +1004,10 @@ public class PmsConfiguration {
 	 * ordered by priority for MEncoder to try to match. Audio language
 	 * and subtitle language should be comma separated as a pair,
 	 * individual pairs should be semicolon separated. "*" can be used to
-	 * match any language. Subtitle language can be defined as "off". For
-	 * example: <code>"en,off;jpn,eng;*,eng;*;*"</code>.
-	 * Default value is <code>""</code>.
+	 * match any language, "loc" to match the local language. Subtitle
+	 * language can be defined as "off".
+	 * Default value is <code>"loc,off;jpn,loc;*,loc;*,*"</code>.
+	 *
 	 * @return The audio and subtitle languages priority string.
 	 */
 	public String getMencoderAudioSubLanguages() {
@@ -1571,7 +1583,7 @@ public class PmsConfiguration {
 	 * @return True if PMS should pass the flag.
 	 */
 	public boolean getAvisynthConvertFps() {
-		return getBoolean(KEY_AVISYNTH_CONVERT_FPS, false);
+		return getBoolean(KEY_AVISYNTH_CONVERT_FPS, true);
 	}
 
 	public void setAvisynthInterFrame(boolean value) {
@@ -1675,7 +1687,33 @@ public class PmsConfiguration {
 	}
 
 	public String getFfmpegSettings() {
-		return getString(KEY_FFMPEG_SETTINGS, "-threads 2 -g 1 -qscale 1 -qmin 2");
+		return getString(KEY_FFMPEG_SETTINGS, "-g 5 -q:v 1 -qmin 2");
+	}
+
+	public void setFfmpegMultithreading(boolean value) {
+		configuration.setProperty(KEY_FFMPEG_MULTITHREADING, value);
+	}
+
+	public boolean isFfmpegMultithreading() {
+		boolean isMultiCore = getNumberOfCpuCores() > 1;
+		return getBoolean(KEY_FFMPEG_MULTITHREADING, isMultiCore);
+	}
+
+	public void setFfmpegAviSynthSettings(String value) {
+		configuration.setProperty(KEY_FFMPEG_AVISYNTH_SETTINGS, value);
+	}
+
+	public String getFfmpegAviSynthSettings() {
+		return getString(KEY_FFMPEG_AVISYNTH_SETTINGS, "-g 5 -q:v 1 -qmin 2");
+	}
+
+	public void setFfmpegAviSynthMultithreading(boolean value) {
+		configuration.setProperty(KEY_FFMPEG_AVISYNTH_MULTITHREADING, value);
+	}
+
+	public boolean isFfmpegAviSynthMultithreading() {
+		boolean isMultiCore = getNumberOfCpuCores() > 1;
+		return getBoolean(KEY_FFMPEG_AVISYNTH_MULTITHREADING, isMultiCore);
 	}
 
 	public boolean isMencoderNoOutOfSync() {
@@ -1790,7 +1828,7 @@ public class PmsConfiguration {
 	}
 
 	public List<String> getEnginesAsList(SystemUtils registry) {
-		List<String> engines = stringToList(getString(KEY_ENGINES, "mencoder,avsmencoder,tsmuxer,ffmpegaudio,mplayeraudio,tsmuxeraudio,vlcvideo,mencoderwebvideo,mplayervideodump,mplayerwebaudio,vlcaudio,ffmpegdvrmsremux,rawthumbs"));
+		List<String> engines = stringToList(getString(KEY_ENGINES, "mencoder,avsmencoder,tsmuxer,ffmpegvideo,ffmpegaudio,mplayeraudio,tsmuxeraudio,ffmpegwebvideo,vlcvideo,mencoderwebvideo,mplayervideodump,mplayerwebaudio,vlcaudio,ffmpegdvrmsremux,rawthumbs"));
 		engines = hackAvs(registry, engines);
 		return engines;
 	}
@@ -2291,5 +2329,29 @@ public class PmsConfiguration {
 	
 	public boolean initBufferMax() {
 		return getBoolean(KEY_BUFFER_MAX, false);
+	}
+	
+	public String getPluginPurgeAction() {
+		return getString(KEY_PLUGIN_PURGE_ACTION, "delete");
+	}
+	
+	public boolean getSearchFolder() {
+		return getBoolean(KEY_SEARCH_FOLDER, false);
+	}
+	
+	public int getSearchRecurse() {
+		if (getBoolean(KEY_SEARCH_RECURSE, true)) {
+			return 100;
+		}
+		else {
+			return 0;
+		}
+	}
+	
+	public void reload() {
+		try {
+			configuration.refresh();
+		} catch (ConfigurationException e) {
+		}
 	}
 }

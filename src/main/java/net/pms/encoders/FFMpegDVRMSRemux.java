@@ -206,4 +206,26 @@ public class FFMpegDVRMSRemux extends Player {
 	public boolean isPlayerCompatible(RendererConfiguration mediaRenderer) {
 		return mediaRenderer.isTranscodeToMPEGPSAC3();
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.VIDEO) {
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.DVRMS)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
