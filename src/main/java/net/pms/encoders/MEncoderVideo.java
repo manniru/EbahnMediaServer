@@ -2263,11 +2263,13 @@ public class MEncoderVideo extends Player {
 				audioPipe.deleteLater();
 			} else {
 				// Remove the -oac switch to prevent video packet errors appearing
-				for (int s = 0; s < cmdArray.length; s++) {
-					if (cmdArray[s].equals("-oac")) {
-						cmdArray[s] = "-nosound";
-						cmdArray[s + 1] = "";
-						break;
+				if (!(avisynth() && configuration.isAvisynthDSS2())) {
+					for (int s = 0; s < cmdArray.length; s++) {
+						if (cmdArray[s].equals("-oac")) {
+							cmdArray[s] = "-nosound";
+							cmdArray[s + 1] = "";
+							break;
+						}
 					}
 				}
 
