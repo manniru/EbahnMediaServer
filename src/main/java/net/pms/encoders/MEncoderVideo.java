@@ -1053,10 +1053,10 @@ public class MEncoderVideo extends Player {
 		defaultArgsList.add("-msglevel");
 		defaultArgsList.add("statusline=2");
 
-		defaultArgsList.add("-oac");
 		if (avisynth() && configuration.isAvisynthDSS2()) {
 			defaultArgsList.add("-nosound");
 		} else {
+			defaultArgsList.add("-oac");
 			defaultArgsList.add((ac3Remux || dtsRemux) ? "copy" : (pcm ? "pcm" : "lavc"));
 		}
 
@@ -1408,7 +1408,6 @@ public class MEncoderVideo extends Player {
 			configuration.isRemuxAC3() &&
 			params.aid != null
 			&& params.aid.isAC3() &&
-			!ps3_and_stereo_and_384_kbits &&
 			!(
 				avisynth() &&
 				!configuration.isAvisynthDSS2()
@@ -2359,8 +2358,6 @@ public class MEncoderVideo extends Player {
 		}
 
 		PipeProcess pipe = null;
-
-		ProcessWrapperImpl pw;
 
 		ProcessWrapperImpl pw = null;
 

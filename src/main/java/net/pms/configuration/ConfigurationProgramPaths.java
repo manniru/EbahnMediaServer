@@ -88,6 +88,6 @@ class ConfigurationProgramPaths implements ProgramPaths {
 
 	@Override
 	public String getAviSynthDLLPath() {
-		return stringFromConfigFile(KEY_AVISYNTHDLL_PATH, defaults.getAviSynthDLLPath());
+		return getString(KEY_AVISYNTHDLL_PATH, defaults.getAviSynthDLLPath());
 	}
 }
