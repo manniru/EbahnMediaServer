@@ -27,6 +27,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JTextField;
@@ -79,11 +80,22 @@ public class FFMpegDVRMSRemux extends Player {
 		return Format.VIDEO;
 	}
 
+	@Deprecated
 	protected String[] getDefaultArgs() {
-		return new String[]{"-f", "vob", "-copyts", "-vcodec", "copy", "-acodec", "copy"};
+		return new String[] {
+			"-vcodec", "copy",
+			"-acodec", "copy",
+			"-threads", "2",
+			"-g", "1",
+			"-qscale", "1",
+			"-qmin", "2",
+			"-f", "vob",
+			"-copyts"
+		};
 	}
 
 	@Override
+	@Deprecated
 	public String[] args() {
 		return getDefaultArgs();
 
@@ -104,15 +116,19 @@ public class FFMpegDVRMSRemux extends Player {
 		String fileName,
 		DLNAResource dlna,
 		DLNAMediaInfo media,
-		OutputParams params) throws IOException {
+		OutputParams params
+	) throws IOException {
 		return getFFMpegTranscode(fileName, dlna, media, params);
 	}
 
+	// pointless redirection of launchTranscode
+	@Deprecated
 	protected ProcessWrapperImpl getFFMpegTranscode(
 		String fileName,
 		DLNAResource dlna,
 		DLNAMediaInfo media,
-		OutputParams params) throws IOException {
+		OutputParams params
+	) throws IOException {
 		PmsConfiguration configuration = PMS.getConfiguration();
 		String ffmpegAlternativePath = configuration.getFfmpegAlternativePath();
 		List<String> cmdList = new ArrayList<String>();
@@ -130,20 +146,14 @@ public class FFMpegDVRMSRemux extends Player {
 
 		cmdList.add("-i");
 		cmdList.add(fileName);
+		cmdList.addAll(Arrays.asList(args()));
 
-		// change this to -metadata title=dummy if this can be made to work with an official ffmpeg build
-		cmdList.add("-title");
-		cmdList.add("dummy");
+		String customSettingsString = configuration.getFfmpegSettings();
+		if (StringUtils.isNotBlank(customSettingsString)) {
+			String[] customSettingsArray = StringUtils.split(customSettingsString);
 
-		for (String arg : args()) {
-			cmdList.add(arg);
-		}
-
-		String[] ffmpegSettings = StringUtils.split(configuration.getFfmpegSettings());
-
-		if (ffmpegSettings != null) {
-			for (String option : ffmpegSettings) {
-				cmdList.add(option);
+			if (customSettingsArray != null) {
+				cmdList.addAll(Arrays.asList(customSettingsArray));
 			}
 		}
 
@@ -152,7 +162,6 @@ public class FFMpegDVRMSRemux extends Player {
 		cmdList.toArray(cmdArray);
 
 		cmdArray = finalizeTranscoderArgs(
-			this,
 			fileName,
 			dlna,
 			media,
@@ -170,14 +179,15 @@ public class FFMpegDVRMSRemux extends Player {
 	public JComponent config() {
 		FormLayout layout = new FormLayout(
 			"left:pref, 3dlu, p, 3dlu, 0:grow",
-			"p, 3dlu, p, 3dlu, 0:grow");
+			"p, 3dlu, p, 3dlu, 0:grow"
+		);
 		PanelBuilder builder = new PanelBuilder(layout);
 		builder.setBorder(Borders.EMPTY_BORDER);
 		builder.setOpaque(false);
 
 		CellConstraints cc = new CellConstraints();
 
-		JComponent cmp = builder.addSeparator(Messages.getString("FFMpegDVRMSRemux.1"), cc.xyw(1, 1, 5));
+		JComponent cmp = builder.addSeparator(Messages.getString("NetworkTab.5"), cc.xyw(1, 1, 5));
 		cmp = (JComponent) cmp.getComponent(0);
 		cmp.setFont(cmp.getFont().deriveFont(Font.BOLD));
 

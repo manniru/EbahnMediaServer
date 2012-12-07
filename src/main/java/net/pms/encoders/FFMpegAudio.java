@@ -26,8 +26,9 @@ import java.awt.Font;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.io.IOException;
-import javax.swing.JCheckBox;
-import javax.swing.JComponent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.*;
 import net.pms.Messages;
 import net.pms.PMS;
 import net.pms.configuration.PmsConfiguration;
@@ -36,30 +37,34 @@ import net.pms.dlna.DLNAResource;
 import net.pms.formats.Format;
 import net.pms.io.OutputParams;
 import net.pms.io.ProcessWrapper;
+import net.pms.io.ProcessWrapperImpl;
 import net.pms.network.HTTPResource;
 
 public class FFMpegAudio extends FFMpegVideo {
 	public static final String ID = "ffmpegaudio";
 	private final PmsConfiguration configuration;
 
+	// should be private
+	@Deprecated
+	JCheckBox noresample;
+
 	public FFMpegAudio(PmsConfiguration configuration) {
 		this.configuration = configuration;
 	}
-	JCheckBox noresample;
 
 	@Override
 	public JComponent config() {
 		FormLayout layout = new FormLayout(
 			"left:pref, 0:grow",
-			"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, 0:grow");
+			"p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, p, 3dlu, 0:grow"
+		);
 		PanelBuilder builder = new PanelBuilder(layout);
 		builder.setBorder(Borders.EMPTY_BORDER);
 		builder.setOpaque(false);
 
 		CellConstraints cc = new CellConstraints();
 
-
-		JComponent cmp = builder.addSeparator("Audio settings", cc.xyw(2, 1, 1));
+		JComponent cmp = builder.addSeparator(Messages.getString("NetworkTab.5"), cc.xyw(2, 1, 1));
 		cmp = (JComponent) cmp.getComponent(0);
 		cmp.setFont(cmp.getFont().deriveFont(Font.BOLD));
 
@@ -67,6 +72,7 @@ public class FFMpegAudio extends FFMpegVideo {
 		noresample.setContentAreaFilled(false);
 		noresample.setSelected(configuration.isAudioResample());
 		noresample.addItemListener(new ItemListener() {
+			@Override
 			public void itemStateChanged(ItemEvent e) {
 				configuration.setAudioResample(e.getStateChange() == ItemEvent.SELECTED);
 			}
@@ -86,11 +92,13 @@ public class FFMpegAudio extends FFMpegVideo {
 		return ID;
 	}
 
+	// FIXME why is this false if launchTranscode supports it (-ss)?
 	@Override
 	public boolean isTimeSeekable() {
 		return false;
 	}
 
+	@Override
 	public boolean avisynth() {
 		return false;
 	}
@@ -106,8 +114,10 @@ public class FFMpegAudio extends FFMpegVideo {
 	}
 
 	@Override
+	@Deprecated
 	public String[] args() {
-		return new String[]{"-f", "s16be", "-ar", "48000"};
+		// unused: kept for backwards compatibility
+		return new String[] {"-f", "s16be", "-ar", "48000"};
 	}
 
 	@Override
@@ -120,28 +130,81 @@ public class FFMpegAudio extends FFMpegVideo {
 		String fileName,
 		DLNAResource dlna,
 		DLNAMediaInfo media,
-		OutputParams params) throws IOException {
-		params.maxBufferSize = PMS.getConfiguration().getMaxAudioBuffer();
+		OutputParams params
+	) throws IOException {
+		params.maxBufferSize = configuration.getMaxAudioBuffer();
 		params.waitbeforestart = 2000;
 		params.manageFastStart();
-		String args[] = args();
+
+		int nThreads = configuration.getNumberOfCpuCores();
+		List<String> cmdList = new ArrayList<String>();
+
+		cmdList.add(executable());
+
+		cmdList.add("-loglevel");
+		cmdList.add("warning");
+
+		if (params.timeseek > 0) {
+			cmdList.add("-ss");
+			cmdList.add("" + params.timeseek);
+		}
+
+		// decoder threads
+		cmdList.add("-threads");
+		cmdList.add("" + nThreads);
+
+		cmdList.add("-i");
+		cmdList.add(fileName);
+
+		// encoder threads
+		cmdList.add("-threads");
+		cmdList.add("" + nThreads);
+
+		if (params.timeend > 0) {
+			cmdList.add("-t");
+			cmdList.add("" + params.timeend);
+		}
+
 		if (params.mediaRenderer.isTranscodeToMP3()) {
-			args = new String[]{"-f", "mp3", "-ar", "48000", "-ab", "320000"};
+			cmdList.add("-f");
+			cmdList.add("mp3");
+			cmdList.add("-ab");
+			cmdList.add("320000");
+		} else if (params.mediaRenderer.isTranscodeToWAV()) {
+			cmdList.add("-f");
+			cmdList.add("wav");
+		} else { // default: LPCM
+			cmdList.add("-f");
+			cmdList.add("s16be"); // same as -f wav, but without a WAV header
 		}
-		if (params.mediaRenderer.isTranscodeToWAV()) {
-			args = new String[]{"-f", "wav", "-ar", "48000"};
+
+		if (configuration.isAudioResample()) {
+			if (params.mediaRenderer.isTranscodeAudioTo441()) {
+				cmdList.add("-ar");
+				cmdList.add("44100");
+			} else {
+				cmdList.add("-ar");
+				cmdList.add("48000");
+			}
 		}
-		if (params.mediaRenderer.isTranscodeAudioTo441()) {
-			args[3] = "44100";
-		}
-		if (!configuration.isAudioResample()) {
-			args[2] = "-vn";
-			args[3] = "-vn";
-		}
-		if (params.mediaRenderer.isTranscodeAudioTo441()) {
-			args[3] = "44100";
-		}
-		return getFFMpegTranscode(fileName, dlna, media, params, args);
+
+		cmdList.add("pipe:");
+
+		String[] cmdArray = new String[ cmdList.size() ];
+		cmdList.toArray(cmdArray);
+
+		cmdArray = finalizeTranscoderArgs(
+			fileName,
+			dlna,
+			media,
+			params,
+			cmdArray
+		);
+
+		ProcessWrapperImpl pw = new ProcessWrapperImpl(cmdArray, params);
+		pw.runInNewThread();
+
+		return pw;
 	}
 
 	/**

@@ -24,6 +24,7 @@ import com.jgoodies.forms.layout.FormLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.ComponentOrientation;
+import java.awt.EventQueue;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
@@ -32,6 +33,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import javax.swing.*;
@@ -66,15 +70,19 @@ public class TracesTab {
 		// According to the javadocs on isPopupTrigger, checking for popup trigger on mousePressed and mouseReleased 
 		// Should be all that is required
 
+		@Override
 		public void mousePressed(MouseEvent e) {
 			showMenuIfPopupTrigger(e);
 		}
 
+		@Override
 		public void mouseReleased(MouseEvent e) {
 			showMenuIfPopupTrigger(e);
 		}
 	}
+
 	private JTextArea jList;
+	protected JScrollPane jListPane;
 
 	TracesTab(PmsConfiguration configuration) {
 		this.configuration = configuration;
@@ -82,6 +90,26 @@ public class TracesTab {
 
 	public JTextArea getList() {
 		return jList;
+	}
+	
+	public void append(String msg) {
+		DateFormat dateFormat = new SimpleDateFormat("MM-dd HH:mm:ss");
+		Date date = new Date();
+
+		String[] messageDisplay = msg.replaceFirst("]", "string that should never match").split("string that should never match");
+		getList().append(dateFormat.format(date) + " " + messageDisplay[1]);
+		final JScrollBar vbar = jListPane.getVerticalScrollBar();
+
+		// If scrollbar was already at the bottom we schedule a new
+		// scroll event to scroll to the bottom again
+		if (vbar.getMaximum() == vbar.getValue() + vbar.getVisibleAmount()) {
+			EventQueue.invokeLater (new Runnable() {
+				@Override
+				public void run() {
+					vbar.setValue(vbar.getMaximum());
+				}
+			});
+		}
 	}
 
 	public JComponent build() {
@@ -92,14 +120,14 @@ public class TracesTab {
 
 		FormLayout layout = new FormLayout(
 			colSpec,
-			"fill:10:grow, p");
+			"fill:10:grow, p"
+		);
 		PanelBuilder builder = new PanelBuilder(layout);
-		//  builder.setBorder(Borders.DLU14_BORDER);
 		builder.setOpaque(true);
 
 		CellConstraints cc = new CellConstraints();
 
-		//create trace text box
+		// Create traces text box
 		jList = new JTextArea();
 		jList.setEditable(false);
 		jList.setBackground(Color.WHITE);
@@ -108,34 +136,39 @@ public class TracesTab {
 		JMenuItem defaultItem = new JMenuItem(Messages.getString("TracesTab.3"));
 
 		defaultItem.addActionListener(new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				jList.setText("");
 			}
 		});
 
 		popup.add(defaultItem);
-		jList.addMouseListener(
-			new PopupTriggerMouseListener(
-			popup,
-			jList));
+		jList.addMouseListener(new PopupTriggerMouseListener(popup, jList));
 
-		JScrollPane pane = new JScrollPane(jList, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		builder.add(pane, cc.xyw(1, 1, 2));
+		jListPane = new JScrollPane(jList, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		jListPane.setBorder(BorderFactory.createEmptyBorder());
+		builder.add(jListPane, cc.xyw(1, 1, 2));
 
-		// Add buttons opening log files
+		// Add buttons to open logfiles (there may be more than one)
 		JPanel pLogFileButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 		HashMap<String, String> logFiles = LoggingConfigFileLoader.getLogFilePaths();
 		for (String loggerName : logFiles.keySet()) {
-			JButton b = new JButton(loggerName);
+			String loggerNameDisplay = loggerName;
+			if ("debug.log".equals(loggerName)) {
+				loggerNameDisplay = Messages.getString("TracesTab.5");
+			}
+			CustomJButton b = new CustomJButton(loggerNameDisplay);
 			b.setToolTipText(logFiles.get(loggerName));
 			b.addMouseListener(new MouseAdapter() {
 				@Override
 				public void mouseClicked(MouseEvent e) {
-					File logFile = new File(((JButton) e.getSource()).getToolTipText());
+					File logFile = new File(((CustomJButton) e.getSource()).getToolTipText());
 					try {
 						java.awt.Desktop.getDesktop().open(logFile);
-					} catch (IOException e1) {
-						LOGGER.error(String.format("Failed to open file %s in default editor", logFile), e1);
+					} catch (IOException ioe) {
+						LOGGER.error(String.format("Failed to open file %s in default editor", logFile), ioe);
+					} catch (UnsupportedOperationException usoe) {
+						LOGGER.error(String.format("Failed to open file %s in default editor", logFile), usoe);
 					}
 				}
 			});
@@ -143,8 +176,9 @@ public class TracesTab {
 		}
 		builder.add(pLogFileButtons, cc.xy(2, 2));
 
-		JButton packDbg = new JButton(Messages.getString("TracesTab.4"));
+		CustomJButton packDbg = new CustomJButton(Messages.getString("TracesTab.4"));
 		packDbg.addMouseListener(new MouseAdapter() {
+			@Override
 			public void mouseClicked(MouseEvent e) {
 				JComponent comp = PMS.get().dbgPack().config();
 				String[] cancelStr = {"Close"};
