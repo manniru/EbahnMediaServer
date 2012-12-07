@@ -359,7 +359,7 @@ public class TSMuxerVideo extends Player {
 							"-o", ffAudioPipe[0].getInputPipe()
 						};
 
-						// use PCM trick when media renderer does not support DTS in MPEG
+						// Use PCM trick when media renderer does not support DTS in MPEG
 						if (!params.mediaRenderer.isMuxDTSToMpeg()) {
 							ffAudioPipe[0].setModifier(sm);
 						}

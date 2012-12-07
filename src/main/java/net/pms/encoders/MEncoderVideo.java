@@ -1415,7 +1415,7 @@ public class MEncoderVideo extends Player {
 			) &&
 			params.mediaRenderer.isTranscodeToAC3()
 		) {
-			// AC3 remux takes priority
+			// AC-3 remux takes priority
 			ac3Remux = true;
 		} else {
 			// Now check for DTS remux and LPCM streaming
@@ -1868,7 +1868,6 @@ public class MEncoderVideo extends Player {
 				avisynth() &&
 				!configuration.isAvisynthDSS2()
 			) &&
-			!avisynth() &&
 			params.aid != null &&
 			media.getAudioTracksList().size() > 1
 		) {
