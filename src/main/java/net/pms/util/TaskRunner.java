@@ -20,15 +20,9 @@ package net.pms.util;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,12 +41,13 @@ public class TaskRunner {
 		if (instance == null) {
 			instance = new TaskRunner();
 		}
+
 		return instance;
 	}
 	
 	private final ExecutorService executors = Executors.newCachedThreadPool(new ThreadFactory() {
-		
 		int counter = 0;
+
 		@Override
 		public Thread newThread(Runnable r) {
 			Thread t = new Thread(r, "background-task-" + (counter++));
@@ -94,6 +89,7 @@ public class TaskRunner {
 			public void run() {
 				String prevName = Thread.currentThread().getName();
 				boolean locked = false;
+
 				try {
 					if (singletonTask) {
 						if (getLock(name).tryLock()) {
@@ -113,6 +109,7 @@ public class TaskRunner {
 					if (locked) {
 						getLock(name).unlock();
 					}
+
 					Thread.currentThread().setName(prevName);
 				}
 			}
@@ -123,10 +120,12 @@ public class TaskRunner {
 	protected Lock getLock(String name) {
 		synchronized(uniquenessLock) {
 			Lock lk = uniquenessLock.get(name);
+
 			if (lk == null) {
 				lk = new ReentrantLock();
 				uniquenessLock.put(name, lk);
 			}
+
 			return lk;
 		}
 	}

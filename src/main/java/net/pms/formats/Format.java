@@ -20,13 +20,11 @@ package net.pms.formats;
 
 import java.util.ArrayList;
 import java.util.StringTokenizer;
-
 import net.pms.configuration.RendererConfiguration;
 import net.pms.dlna.DLNAMediaInfo;
 import net.pms.dlna.InputFile;
 import net.pms.encoders.Player;
 import net.pms.network.HTTPResource;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +33,26 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class Format implements Cloneable {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Format.class);
+
+	public enum Identifier {
+		AUDIO_AS_VIDEO,
+		DVRMS,
+		FLAC,
+		GIF,
+		ISO,
+		JPG,
+		M4A,
+		MKV,
+		MP3,
+		MPG,
+		OGG,
+		PNG,
+		RAW,
+		TIF,
+		WAV,
+		WEB,
+		CUSTOM
+	}
 
 	public int getType() {
 		return type;
@@ -246,8 +264,15 @@ public abstract class Format implements Cloneable {
 	 * Return the class name for string representation.
 	 * @return The name.
 	 */
+	@Override
 	public String toString() {
 		return getClass().getSimpleName();
-		
 	}
+
+	/**
+	 * Returns the identifier string for the format.
+	 *
+	 * @return The identifier string.
+	 */
+	public abstract Identifier getIdentifier();
 }

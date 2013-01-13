@@ -19,13 +19,10 @@
 package net.pms.encoders;
 
 import com.sun.jna.Platform;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.swing.JComponent;
-
 import net.pms.configuration.PmsConfiguration;
 import net.pms.dlna.DLNAMediaInfo;
 import net.pms.dlna.DLNAResource;
@@ -143,7 +140,8 @@ public class VideoLanVideoStreaming extends Player {
 			getEncodingArgs(),
 			getMux(),
 			(isWindows ? "\\\\" : ""),
-			tsPipe.getInputPipe());
+			tsPipe.getInputPipe()
+		);
 
 		// XXX there's precious little documentation on how (if at all) VLC
 		// treats colons and hyphens (and :name= and --name=) differently
@@ -172,7 +170,6 @@ public class VideoLanVideoStreaming extends Player {
 		cmdList.toArray(cmdArray);
 
 		cmdArray = finalizeTranscoderArgs(
-			this,
 			fileName,
 			dlna,
 			media,
@@ -194,5 +191,27 @@ public class VideoLanVideoStreaming extends Player {
 	@Override
 	public JComponent config() {
 		return null;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isCompatible(DLNAResource resource) {
+		if (resource == null || resource.getFormat().getType() != Format.VIDEO) {
+			return false;
+		}
+
+		Format format = resource.getFormat();
+
+		if (format != null) {
+			Format.Identifier id = format.getIdentifier();
+
+			if (id.equals(Format.Identifier.WEB)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

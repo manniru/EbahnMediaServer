@@ -19,22 +19,20 @@
  */
 package net.pms.encoders;
 
+import com.sun.jna.Platform;
 import java.io.File;
 import java.util.ArrayList;
-
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import net.pms.PMS;
 import net.pms.configuration.PmsConfiguration;
+import net.pms.dlna.DLNAResource;
 import net.pms.formats.Format;
 import net.pms.formats.FormatFactory;
-import net.pms.io.BasicSystemUtils;
-import net.pms.io.MacSystemUtils;
-import net.pms.io.SolarisUtils;
 import net.pms.io.SystemUtils;
-import net.pms.io.WinUtils;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.sun.jna.Platform;
 
 /**
  * This class handles players. Creating an instance will initialize the list of
@@ -66,6 +64,35 @@ public final class PlayerFactory {
 	private static SystemUtils utils;
 
 	/**
+	 * This takes care of sorting the players by the given PMS configuration.
+	 */
+	private static class PlayerSort implements Comparator<Player> {
+		private PmsConfiguration configuration;
+
+		PlayerSort(PmsConfiguration configuration) {
+			this.configuration = configuration;
+		}
+
+		@Override
+		public int compare(Player player1, Player player2) {
+			List<String> prefs = configuration.getEnginesAsList(PMS.get().getRegistry());
+			Integer index1 = prefs.indexOf(player1.id());
+			Integer index2 = prefs.indexOf(player2.id());
+
+			// Not being in the configuration settings will sort the player as last.
+			if (index1 == -1) {
+				index1 = 999;
+			}
+
+			if (index2 == -1) {
+				index2 = 999;
+			}
+
+			return index1.compareTo(index2);
+		}
+	}
+
+	/**
 	 * This class is not meant to be instantiated.
 	 */
 	private PlayerFactory() {
@@ -78,31 +105,8 @@ public final class PlayerFactory {
 	 * @param configuration The PMS configuration.
 	 */
 	public static void initialize(final PmsConfiguration configuration) {
-		utils = createSystemUtils();
+		utils = PMS.get().getRegistry();
 		registerPlayers(configuration);
-	}
-
-	/**
-	 * Creates system utilities. These are needed to determine isAvis() in
-	 * {@link #registerPlayer(Player)}.
-	 *
-	 * @return The system utilities.
-	 */
-	// FIXME this is duplicated in PMS.java
-	private static SystemUtils createSystemUtils() {
-		if (Platform.isWindows()) {
-			return new WinUtils();
-		} else {
-			if (Platform.isMac()) {
-				return new MacSystemUtils();
-			} else {
-				if (Platform.isSolaris()) {
-					return new SolarisUtils();
-				} else {
-					return new BasicSystemUtils();
-				}
-			}
-		}
 	}
 
 	/**
@@ -113,31 +117,38 @@ public final class PlayerFactory {
 	 */
 	private static void registerPlayers(final PmsConfiguration configuration) {
 
+		// TODO make these constructors consistent: pass configuration to all or to none
 		if (Platform.isWindows()) {
-			registerPlayer(new FFMpegVideo());
+			registerPlayer(new AviSynthFFmpeg());
 		}
 
-		registerPlayer(new FFMpegAudio(configuration));
+		registerPlayer(new FFmpegAudio(configuration));
 		registerPlayer(new MEncoderVideo(configuration));
 
 		if (Platform.isWindows()) {
-			registerPlayer(new MEncoderAviSynth(configuration));
+			registerPlayer(new AviSynthMEncoder(configuration));
 		}
 
+		registerPlayer(new FFmpegVideo());
 		registerPlayer(new MPlayerAudio(configuration));
+		registerPlayer(new FFmpegWebVideo(configuration));
 		registerPlayer(new MEncoderWebVideo(configuration));
 		registerPlayer(new MPlayerWebVideoDump(configuration));
 		registerPlayer(new MPlayerWebAudio(configuration));
-		registerPlayer(new TSMuxerVideo(configuration));
-		registerPlayer(new TsMuxerAudio(configuration));
+		registerPlayer(new TsMuxeRVideo(configuration));
+		registerPlayer(new TsMuxeRAudio(configuration));
 		registerPlayer(new VideoLanAudioStreaming(configuration));
 		registerPlayer(new VideoLanVideoStreaming(configuration));
 
 		if (Platform.isWindows()) {
-			registerPlayer(new FFMpegDVRMSRemux());
+			registerPlayer(new FFmpegDVRMSRemux());
 		}
 
 		registerPlayer(new RAWThumbnailer());
+
+		// Sort the players according to the configuration settings
+		Collections.sort(allPlayers, new PlayerSort(configuration));
+		Collections.sort(players, new PlayerSort(configuration));
 	}
 
 	/**
@@ -212,6 +223,8 @@ public final class PlayerFactory {
 	}
 
 	/**
+	 * @deprecated Use {@link #getPlayer(DLNAResource)} instead.
+	 *
 	 * Returns the player that matches the given class and format.
 	 * 
 	 * @param profileClass
@@ -221,6 +234,7 @@ public final class PlayerFactory {
 	 * @return The player if a match could be found, <code>null</code>
 	 *         otherwise.
 	 */
+	@Deprecated
 	public static Player getPlayer(final Class<? extends Player> profileClass,
 			final Format ext) {
 
@@ -236,6 +250,37 @@ public final class PlayerFactory {
 	}
 
 	/**
+	 * Returns the first {@link Player} that matches the given mediaInfo or
+	 * format. Each of the available players is passed the provided information
+	 * and the first that reports it is compatible will be returned.
+	 * 
+	 * @param resource
+	 *            The {@link DLNAMediaResource} to match
+	 * @return The player if a match could be found, <code>null</code>
+	 *         otherwise.
+	 * @since 1.60.0
+	 */
+	public static Player getPlayer(final DLNAResource resource) {
+		if (resource == null) {
+			return null;
+		}
+
+		List<String> enabledEngines = PMS.getConfiguration().getEnginesAsList(PMS.get().getRegistry());
+
+		for (Player player : players) {
+			if (enabledEngines.contains(player.id()) && player.isCompatible(resource)) {
+				// Player is enabled and compatible
+				LOGGER.trace("Selecting player " + player.name() + " for resource " + resource.getName());
+				return player;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @deprecated Use {@link #getPlayer(DLNAResource)} instead. 
+	 *
 	 * Returns the players matching the given classes and type.
 	 * 
 	 * @param profileClasses
@@ -245,6 +290,7 @@ public final class PlayerFactory {
 	 * @return The list of players that match. If no players match, an empty
 	 *         list is returned.
 	 */
+	@Deprecated
 	public static ArrayList<Player> getPlayers(
 			final ArrayList<Class<? extends Player>> profileClasses,
 			final int type) {
@@ -259,5 +305,46 @@ public final class PlayerFactory {
 		}
 
 		return compatiblePlayers;
+	}
+
+	/**
+	 * Returns all {@link Player}s that match the given resource and are
+	 * enabled. Each of the available players is passed the provided information
+	 * and each player that reports it is compatible will be returned.
+	 *
+	 * @param resource
+	 *        The {@link DLNAResource} to match
+	 * @return The list of compatible players if a match could be found,
+	 *         <code>null</code> otherwise.
+	 * @since 1.60.0
+	 */
+	public static ArrayList<Player> getPlayers(final DLNAResource resource) {
+		if (resource == null) {
+			return null;
+		}
+
+		List<String> enabledEngines = PMS.getConfiguration().getEnginesAsList(PMS.get().getRegistry());
+		ArrayList<Player> compatiblePlayers = new ArrayList<Player>();
+
+		for (Player player : players) {
+			if (enabledEngines.contains(player.id()) && player.isCompatible(resource)) {
+				// Player is enabled and compatible
+				LOGGER.trace("Player " + player.name() + " is compatible with resource " + resource.getName());
+				compatiblePlayers.add(player);
+			}
+		}
+
+		return compatiblePlayers;
+	}
+
+	/**
+	 * @deprecated Use {@link #getPlayers(DLNAResource)} instead.
+	 *
+	 * @param resource The resource to match
+	 * @return The list of players if a match could be found, null otherwise.
+	 */
+	@Deprecated
+	public static ArrayList<Player> getEnabledPlayers(final DLNAResource resource) {
+		return getPlayers(resource);
 	}
 }

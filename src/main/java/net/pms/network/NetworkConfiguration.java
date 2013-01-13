@@ -18,24 +18,10 @@
  */
 package net.pms.network;
 
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import java.net.*;
+import java.util.*;
 import net.pms.PMS;
 import net.pms.configuration.PmsConfiguration;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,27 +123,27 @@ public class NetworkConfiguration {
 	/**
 	 * The list of discovered network interfaces.
 	 */
-	List<InterfaceAssociation> interfaces = new ArrayList<InterfaceAssociation>();
+	private List<InterfaceAssociation> interfaces = new ArrayList<InterfaceAssociation>();
 
 	/**
 	 * The map of discovered default IP addresses belonging to a network interface.
 	 */
-	Map<String, InterfaceAssociation> mainAddress = new HashMap<String, InterfaceAssociation>();
+	private Map<String, InterfaceAssociation> mainAddress = new HashMap<String, InterfaceAssociation>();
 
 	/**
 	 * The map of IP addresses connected to an interface name.
 	 */
-	Map<String, Set<InetAddress>> addressMap = new HashMap<String, Set<InetAddress>>();
+	private Map<String, Set<InetAddress>> addressMap = new HashMap<String, Set<InetAddress>>();
 
 	/**
 	 * The list of configured network interface names that should be skipped.
 	 * 
 	 * @see PmsConfiguration#getSkipNetworkInterfaces()
 	 */
-	List<String> skipNetworkInterfaces = PMS.getConfiguration().getSkipNetworkInterfaces();
+	private List<String> skipNetworkInterfaces = PMS.getConfiguration().getSkipNetworkInterfaces();
 
 	/**
-	 * Default constructor, however this is a singleton class: use
+	 * Default constructor. However, this is a singleton class: use
 	 * {@link #getInstance()} to retrieve an instance.
 	 */
 	private NetworkConfiguration(Enumeration<NetworkInterface> networkInterfaces) {
@@ -165,8 +151,8 @@ public class NetworkConfiguration {
 	}
 
 	/**
-	 * Collect the all relevant addresses for the given network interface, add
-	 * them to the global address map and return them.
+	 * Collect all of the relevant addresses for the given network interface,
+	 * add them to the global address map and return them.
 	 * 
 	 * @param networkInterface
 	 *            The network interface.
@@ -205,7 +191,6 @@ public class NetworkConfiguration {
 	private boolean isRelevantAddress(InetAddress address) {
 		return !(address instanceof Inet6Address || address.isLoopbackAddress());
 	}
-
 
 	/**
 	 * Discovers the list of relevant network interfaces based on the provided
@@ -334,18 +319,20 @@ public class NetworkConfiguration {
 	 */
 	public List<String> getDisplayNames() {
 		List<String> result = new ArrayList<String>(interfaces.size());
+
 		for (InterfaceAssociation i : interfaces) {
 				result.add(i.getDisplayName());
 		}
+
 		return result;
 	}
 
 	/**
-	 * Returns the default network interface address. This is the first network
-	 * interface that does not have a parent. This should avoid alias interfaces
-	 * being returned. If no interfaces were discovered, <code>null</code> will
-	 * be returned.
-	 * 
+	 * Returns the default IP address associated with the default network interface.
+	 * This is the first network interface that does not have a parent. This
+	 * should avoid alias interfaces being returned. If no interfaces were discovered,
+	 * <code>null</code> is returned.
+	 *
 	 * @return The address.
 	 */
 	public InterfaceAssociation getDefaultNetworkInterfaceAddress() {
@@ -369,7 +356,7 @@ public class NetworkConfiguration {
 	/**
 	 * Returns the first interface from the list of discovered interfaces that
 	 * has an address. If no such interface can be found or if no interfaces
-	 * were discovered <code>null</code> is returned.
+	 * were discovered, <code>null</code> is returned.
 	 * 
 	 * @return The interface.
 	 */
@@ -384,8 +371,8 @@ public class NetworkConfiguration {
 	}
 
 	/**
-	 * Returns the default IP address and network interface for the given name,
-	 * or <code>null</code> if it has not been discovered.
+	 * Returns the default IP address associated with the the given interface
+	 * name, or <code>null</code> if it has not been discovered.
 	 * 
 	 * @param name
 	 *            The name of the interface.

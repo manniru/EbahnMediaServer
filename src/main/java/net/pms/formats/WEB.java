@@ -19,18 +19,23 @@
 package net.pms.formats;
 
 import java.util.ArrayList;
-
 import net.pms.PMS;
+import net.pms.configuration.PmsConfiguration;
 import net.pms.configuration.RendererConfiguration;
 import net.pms.dlna.DLNAMediaInfo;
-import net.pms.encoders.MEncoderWebVideo;
-import net.pms.encoders.MPlayerWebAudio;
-import net.pms.encoders.MPlayerWebVideoDump;
-import net.pms.encoders.Player;
-import net.pms.encoders.VideoLanAudioStreaming;
-import net.pms.encoders.VideoLanVideoStreaming;
+import net.pms.encoders.*;
 
 public class WEB extends Format {
+	private static final PmsConfiguration configuration = PMS.getConfiguration();
+	
+	/**
+	 * {@inheritDoc} 
+	 */
+	@Override
+	public Identifier getIdentifier() {
+		return Identifier.WEB;
+	}
+
 	/**
 	 * @deprecated Use {@link #isCompatible(DLNAMediaInfo, RendererConfiguration)} instead.
 	 * <p>
@@ -51,7 +56,7 @@ public class WEB extends Format {
 		ArrayList<Class<? extends Player>> a = new ArrayList<Class<? extends Player>>();
 		if (type == AUDIO) {
 			PMS r = PMS.get();
-			for (String engine : PMS.getConfiguration().getEnginesAsList(r.getRegistry())) {
+			for (String engine : configuration.getEnginesAsList(r.getRegistry())) {
 				if (engine.equals(MPlayerWebAudio.ID)) {
 					a.add(MPlayerWebAudio.class);
 				} else if (engine.equals(VideoLanAudioStreaming.ID)) {
@@ -60,8 +65,10 @@ public class WEB extends Format {
 			}
 		} else {
 			PMS r = PMS.get();
-			for (String engine : PMS.getConfiguration().getEnginesAsList(r.getRegistry())) {
-				if (engine.equals(MEncoderWebVideo.ID)) {
+			for (String engine : configuration.getEnginesAsList(r.getRegistry())) {
+				if (engine.equals(FFmpegWebVideo.ID)) {
+					a.add(FFmpegWebVideo.class);
+				} else if (engine.equals(MEncoderWebVideo.ID)) {
 					a.add(MEncoderWebVideo.class);
 				} else if (engine.equals(VideoLanVideoStreaming.ID)) {
 					a.add(VideoLanVideoStreaming.class);
@@ -70,6 +77,7 @@ public class WEB extends Format {
 				}
 			}
 		}
+
 		return a;
 	}
 
@@ -77,8 +85,9 @@ public class WEB extends Format {
 	 * {@inheritDoc}
 	 */
 	@Override
+	// TODO remove screen - it's been tried numerous times (see forum) and it doesn't work
 	public String[] getId() {
-		return new String[] { "http", "mms", "rtsp", "rtp", "udp", "screen" };
+		return new String[] { "http", "mms", "mmsh", "mmst", "rtsp", "rtp", "udp", "screen" };
 	}
 
 	@Override

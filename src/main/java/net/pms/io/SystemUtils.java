@@ -3,7 +3,6 @@ package net.pms.io;
 import java.io.File;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-
 import net.pms.newgui.LooksFrame;
 
 public interface SystemUtils {
@@ -13,6 +12,8 @@ public interface SystemUtils {
 	public abstract void reenableGoToSleep();
 
 	public abstract File getAvsPluginsDir();
+
+	public abstract File getKLiteFiltersDir();
 
 	public abstract String getShortPathNameW(String longPathName);
 
