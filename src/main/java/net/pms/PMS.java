@@ -23,8 +23,6 @@ import com.sun.jna.Platform;
 import java.awt.*;
 import java.io.*;
 import java.net.BindException;
-import java.net.URI;
-import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
@@ -50,7 +48,6 @@ import net.pms.network.HTTPServer;
 import net.pms.network.ProxyServer;
 import net.pms.network.UPNPHelper;
 import net.pms.newgui.DbgPacker;
-import net.pms.newgui.GeneralTab;
 import net.pms.newgui.LooksFrame;
 import net.pms.newgui.ProfileChooser;
 import net.pms.update.AutoUpdater;
@@ -1158,7 +1155,7 @@ public class PMS {
 	private void logSystemInfo() {
 		long memoryInMB = Runtime.getRuntime().maxMemory() / 1048576;
 
-		LOGGER.info("Java: " + System.getProperty("java.version") + "-" + System.getProperty("java.vendor"));
+		LOGGER.info("Java: " + System.getProperty("java.version") + " - " + System.getProperty("sun.arch.data.model") + "bit" + " - " + System.getProperty("java.vendor"));
 		LOGGER.info("OS: " + System.getProperty("os.name") + " " + getOSBitness() + "-bit " + System.getProperty("os.version"));
 		LOGGER.info("Encoding: " + System.getProperty("file.encoding"));
 		LOGGER.info("Memory: " + memoryInMB + " " + Messages.getString("StatusTab.12"));

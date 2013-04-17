@@ -336,27 +336,29 @@ public class RequestV2 extends HTTPResource {
 
 					inputStream = dlna.getInputStream(Range.create(lowRange, highRange, range.getStart(), range.getEnd()), mediaRenderer);
 
-					// Some renderers (like Samsung devices) allow a custom header for a subtitle URL
-					String subtitleHttpHeader = mediaRenderer.getSubtitleHttpHeader();
+					if (!configuration.isDisableSubtitles()) {
+						// Some renderers (like Samsung devices) allow a custom header for a subtitle URL
+						String subtitleHttpHeader = mediaRenderer.getSubtitleHttpHeader();
 
-					if (subtitleHttpHeader != null && !"".equals(subtitleHttpHeader)) {
-						// Device allows a custom subtitle HTTP header; construct it
-						List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitleTracksList();
+						if (subtitleHttpHeader != null && !"".equals(subtitleHttpHeader)) {
+							// Device allows a custom subtitle HTTP header; construct it
+							List<DLNAMediaSubtitle> subs = dlna.getMedia().getSubtitleTracksList();
 
-						if (subs != null && !subs.isEmpty()) {
-							DLNAMediaSubtitle sub = subs.get(0);
-							String subtitleUrl;
-							String subExtension = sub.getType().getExtension();
-							if (isNotBlank(subExtension)) {
-								subtitleUrl = "http://" + PMS.get().getServer().getHost() +
-									':' + PMS.get().getServer().getPort() + "/get/" +
-									id + "/subtitle0000." + subExtension;
-							} else {
-								subtitleUrl = "http://" + PMS.get().getServer().getHost() +
-									':' + PMS.get().getServer().getPort() + "/get/" +
-									id + "/subtitle0000";
+							if (subs != null && !subs.isEmpty()) {
+								DLNAMediaSubtitle sub = subs.get(0);
+								String subtitleUrl;
+								String subExtension = sub.getType().getExtension();
+								if (isNotBlank(subExtension)) {
+									subtitleUrl = "http://" + PMS.get().getServer().getHost() +
+										':' + PMS.get().getServer().getPort() + "/get/" +
+										id + "/subtitle0000." + subExtension;
+								} else {
+									subtitleUrl = "http://" + PMS.get().getServer().getHost() +
+										':' + PMS.get().getServer().getPort() + "/get/" +
+										id + "/subtitle0000";
+								}
+								output.setHeader(subtitleHttpHeader, subtitleUrl);
 							}
-							output.setHeader(subtitleHttpHeader, subtitleUrl);
 						}
 					}
 
@@ -850,9 +852,9 @@ public class RequestV2 extends HTTPResource {
 
 			if (range.isStartOffsetAvailable() && dlna != null) {
 				// Add timeseek information headers.
-				String timeseekValue = StringUtil.convertTimeToString(range.getStartOrZero(), true);
+				String timeseekValue = DLNAMediaInfo.getDurationString(range.getStartOrZero());
 				String timetotalValue = dlna.getMedia().getDurationString();
-				String timeEndValue = range.isEndLimitAvailable() ? StringUtil.convertTimeToString(range.getEnd(), true) : timetotalValue;
+				String timeEndValue = range.isEndLimitAvailable() ? DLNAMediaInfo.getDurationString(range.getEnd()) : timetotalValue;
 				output.setHeader("TimeSeekRange.dlna.org", "npt=" + timeseekValue + "-" + timeEndValue + "/" + timetotalValue);
 				output.setHeader("X-Seek-Range", "npt=" + timeseekValue + "-" + timeEndValue + "/" + timetotalValue);
 			}
