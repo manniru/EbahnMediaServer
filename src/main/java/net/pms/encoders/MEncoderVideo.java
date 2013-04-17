@@ -33,6 +33,7 @@ import java.io.PrintWriter;
 import java.util.*;
 import java.util.List;
 import javax.swing.*;
+
 import net.pms.Messages;
 import net.pms.PMS;
 import net.pms.configuration.FormatConfiguration;
@@ -46,6 +47,8 @@ import net.pms.formats.v2.SubtitleUtils;
 import net.pms.io.*;
 import net.pms.network.HTTPResource;
 import net.pms.newgui.CustomJButton;
+import net.pms.newgui.FontFileFilter;
+import net.pms.newgui.MyComboBoxModel;
 import net.pms.util.CodecUtil;
 import net.pms.util.FileUtil;
 import net.pms.util.FormLayoutUtil;
@@ -92,6 +95,7 @@ public class MEncoderVideo extends Player {
 	private JButton fontselect;
 	private JTextField ocw;
 	private JTextField och;
+	private JCheckBox fribidi;
 	private final PmsConfiguration configuration;
 
 	private static final String[] INVALID_CUSTOM_OPTIONS = {
