@@ -162,6 +162,13 @@ public class VLCVideo extends Player {
 			codecConfig.container = "ts";
 
 			videoRemux = true;
+		} else if (renderer.isTranscodeToH264PSMP2()) {
+			LOGGER.debug("Using H.264 and MP2 with ps container");
+			codecConfig.videoCodec = "h264";
+			codecConfig.audioCodec = "mp2a";
+			codecConfig.container = "ps";
+
+			videoRemux = true;
 		} else {
 			codecConfig.videoCodec = "mp2v";
 			codecConfig.audioCodec = "mp2a";

@@ -50,6 +50,7 @@ public class RendererConfiguration {
 	private static final String MPEGPSAC3 = "MPEGPSAC3";
 	private static final String MPEGTSAC3 = "MPEGTSAC3";
 	private static final String H264TSAC3 = "H264TSAC3";
+	private static final String H264PSMP2 = "H264PSMP2";
 	private static final String WAV = "WAV";
 	private static final String WMV = "WMV";
 
@@ -517,6 +518,10 @@ public class RendererConfiguration {
 
 	public boolean isTranscodeToH264TSAC3() {
 		return getVideoTranscode().equals(H264TSAC3);
+	}
+
+	public boolean isTranscodeToH264PSMP2() {
+		return getVideoTranscode().equals(H264PSMP2);
 	}
 
 	public boolean isAutoRotateBasedOnExif() {

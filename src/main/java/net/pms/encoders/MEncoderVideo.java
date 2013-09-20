@@ -115,6 +115,7 @@ public class MEncoderVideo extends Player {
 	protected boolean ac3Remux;
 	protected boolean mpegts;
 	protected boolean h264ts;
+	protected boolean h264ps;
 	protected boolean wmv;
 
 	public static final String DEFAULT_CODEC_CONF_SCRIPT =
@@ -599,7 +600,7 @@ public class MEncoderVideo extends Player {
 		}
 
 		defaultArgsList.add("-of");
-		if (wmv || mpegts || h264ts) {
+		if (wmv || mpegts || h264ts || h264ps) {
 			defaultArgsList.add("lavf");
 		} else if (pcm && avisynth()) {
 			defaultArgsList.add("avi");
@@ -615,6 +616,9 @@ public class MEncoderVideo extends Player {
 		} else if (mpegts || h264ts) {
 			defaultArgsList.add("-lavfopts");
 			defaultArgsList.add("format=mpegts");
+		} else if (h264ps) {
+			defaultArgsList.add("-lavfopts");
+			defaultArgsList.add("format=mpg");
 		}
 
 		defaultArgsList.add("-mpegopts");
@@ -786,6 +790,9 @@ public class MEncoderVideo extends Player {
 					break;
 				case "ac3":
 					defaultMaxBitrates[0] = defaultMaxBitrates[0] - configuration.getAudioBitrate();
+					break;
+				case "mp2":
+					defaultMaxBitrates[0] = defaultMaxBitrates[0] - 320;
 					break;
 			}
 
@@ -982,10 +989,11 @@ public class MEncoderVideo extends Player {
 
 		mpegts = params.mediaRenderer.isTranscodeToMPEGTSAC3();
 		h264ts = params.mediaRenderer.isTranscodeToH264TSAC3();
+		h264ps = params.mediaRenderer.isTranscodeToH264PSMP2();
 
 		String vcodec = "mpeg2video";
 
-		if (h264ts) {
+		if (h264ts || h264ps) {
 			vcodec = "libx264";
 		} else if (params.mediaRenderer.isTranscodeToWMV() && !params.mediaRenderer.isXBOX()) {
 			wmv = true;
@@ -1070,7 +1078,7 @@ public class MEncoderVideo extends Player {
 		int channels;
 		if (ac3Remux) {
 			channels = params.aid.getAudioProperties().getNumberOfChannels(); // AC-3 remux
-		} else if (dtsRemux || (!params.mediaRenderer.isXBOX() && wmv)) {
+		} else if (dtsRemux || (!params.mediaRenderer.isXBOX() && wmv) || params.mediaRenderer.isTranscodeToH264PSMP2()) {
 			channels = 2;
 		} else if (pcm) {
 			channels = params.aid.getAudioProperties().getNumberOfChannels();
@@ -1152,7 +1160,7 @@ public class MEncoderVideo extends Player {
 			}
 		}
 
-		if (configuration.getMPEG2MainSettings() != null && !h264ts) {
+		if (configuration.getMPEG2MainSettings() != null && !h264ts && !h264ps) {
 			String mpeg2Options = configuration.getMPEG2MainSettings();
 			String mpeg2OptionsRenderer = params.mediaRenderer.getCustomMEncoderMPEG2Options();
 
@@ -1230,7 +1238,7 @@ public class MEncoderVideo extends Player {
 					overriddenMainArgs[i++] = st.nextToken();
 				}
 			}
-		} else if (configuration.getx264ConstantRateFactor() != null && h264ts) {
+		} else if (configuration.getx264ConstantRateFactor() != null && (h264ts || h264ps)) {
 			String x264CRF = configuration.getx264ConstantRateFactor();
 
 			// Remove comment from the value
@@ -1250,15 +1258,24 @@ public class MEncoderVideo extends Player {
 				x264CRF = "crf=" + x264CRF + ",";
 			}
 
-			String encodeSettings = "-lavcopts autoaspect=1:vcodec=" + vcodec +
-				(wmv && !params.mediaRenderer.isXBOX() ? ":acodec=wmav2:abitrate=448" : (":acodec=" + (configuration.isMencoderAc3Fixed() ? "ac3_fixed" : "ac3") +
-				":abitrate=" + CodecUtil.getAC3Bitrate(configuration, params.aid))) +
+			String lavcoptsAudio = ":acodec=ac3:abitrate=" + CodecUtil.getAC3Bitrate(configuration, params.aid);
+			if (params.mediaRenderer.isTranscodeToH264PSMP2()) {
+				lavcoptsAudio = ":acodec=mp2:abitrate=224";
+			} else if (wmv && !params.mediaRenderer.isXBOX()) {
+				lavcoptsAudio = ":acodec=wmav2:abitrate=448";
+			} else if (configuration.isMencoderAc3Fixed()) {
+				lavcoptsAudio = ":acodec=ac3_fixed:abitrate=" + CodecUtil.getAC3Bitrate(configuration, params.aid);
+			}
+
+			String encodeSettings = "-lavcopts autoaspect=1:vcodec=" + vcodec + lavcoptsAudio +
 				":threads=" + (wmv && !params.mediaRenderer.isXBOX() ? 1 : configuration.getMencoderMaxThreads()) +
-				(h264ts ? ":o=preset=superfast," + x264CRF + "g=250,i_qfactor=0.71,qcomp=0.6,level=4.1,weightp=0,8x8dct=0,aq-strength=0" : "");
+				(h264ts || h264ps ? ":o=preset=superfast," + x264CRF + "g=250,i_qfactor=0.71,qcomp=0.6,level=4.1,weightp=0,8x8dct=0,aq-strength=0" : "");
 
 			String audioType = "ac3";
 			if (dtsRemux) {
 				audioType = "dts";
+			} else if (params.mediaRenderer.isTranscodeToH264PSMP2()) {
+				audioType = "mp2";
 			} else if (pcm) {
 				audioType = "pcm";
 			}
