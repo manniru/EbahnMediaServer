@@ -203,7 +203,7 @@ public class FFMpegVideo extends Player {
 	}
 
 	@Deprecated
-	public List<String> getTranscodeVideoOptions(RendererConfiguration renderer, DLNAMediaInfo media, OutputParams params) {
+	public synchronized List<String> getTranscodeVideoOptions(RendererConfiguration renderer, DLNAMediaInfo media, OutputParams params) {
 		return getTranscodeVideoOptions(renderer, media, params, null);
 	}
 
@@ -220,7 +220,7 @@ public class FFMpegVideo extends Player {
 	 * @return a {@link List} of <code>String</code>s representing the FFmpeg output parameters for the renderer according
 	 * to its <code>TranscodeVideo</code> profile.
 	 */
-	public List<String> getTranscodeVideoOptions(RendererConfiguration renderer, DLNAMediaInfo media, OutputParams params, String fileName) {
+	public synchronized List<String> getTranscodeVideoOptions(RendererConfiguration renderer, DLNAMediaInfo media, OutputParams params, String fileName) {
 		List<String> transcodeOptions = new ArrayList<>();
 
 		if (renderer.isTranscodeToWMV()) { // WMV
@@ -455,12 +455,6 @@ public class FFMpegVideo extends Player {
 		return getDefaultArgs(); // unused; return this array for for backwards compatibility
 	}
 
-	// XXX hardwired to false and not referenced anywhere else in the codebase
-	@Deprecated
-	public boolean mplayer() {
-		return false;
-	}
-
 	@Override
 	public String mimeType() {
 		return HTTPResource.VIDEO_TRANSCODE;
@@ -477,7 +471,7 @@ public class FFMpegVideo extends Player {
 	}
 
 	@Override
-	public ProcessWrapper launchTranscode(
+	public synchronized ProcessWrapper launchTranscode(
 		String fileName,
 		DLNAResource dlna,
 		DLNAMediaInfo media,
