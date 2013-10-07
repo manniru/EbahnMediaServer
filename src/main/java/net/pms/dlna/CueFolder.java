@@ -8,6 +8,7 @@ import java.util.List;
 import jwbroek.cuelib.*;
 import net.pms.PMS;
 import net.pms.configuration.PmsConfiguration;
+import net.pms.dlna.Range.Time;
 import net.pms.encoders.MEncoderVideo;
 import net.pms.encoders.MPlayerAudio;
 import net.pms.encoders.Player;
@@ -166,13 +167,15 @@ public class CueFolder extends DLNAResource {
 					}
 
 					if (tracks.size() > 0 && addedResources.size() > 0) {
-						// last track
-						DLNAResource prec = addedResources.get(addedResources.size() - 1);
-						try {
-							prec.getSplitRange().setEnd(prec.getMedia().getDurationInSeconds());
-							prec.getMedia().setDuration(prec.getSplitRange().getDuration());
-						} catch (NullPointerException e) { }
-						LOGGER.debug("Track #" + childrenNumber() + " split range: " + prec.getSplitRange().getStartOrZero() + " - " + prec.getSplitRange().getDuration());
+						DLNAResource lastTrack = addedResources.get(addedResources.size() - 1);
+						Time lastTrackSplitRange = lastTrack.getSplitRange();
+						DLNAMediaInfo lastTrackMedia = lastTrack.getMedia();
+
+						if (lastTrackSplitRange != null && lastTrackMedia != null) {
+							lastTrackSplitRange.setEnd(lastTrackMedia.getDurationInSeconds());
+							lastTrackMedia.setDuration(lastTrackSplitRange.getDuration());
+							LOGGER.debug("Track #" + childrenNumber() + " split range: " + lastTrackSplitRange.getStartOrZero() + " - " + lastTrackSplitRange.getDuration());
+						}
 					}
 
 					PMS.get().storeFileInCache(playlistfile, Format.PLAYLIST);
