@@ -97,7 +97,7 @@ public class FFmpegAudio extends FFMpegVideo {
 
 	@Override
 	public boolean isTimeSeekable() {
-		return true;
+		return false;
 	}
 
 	@Override
