@@ -244,7 +244,7 @@ public class TsMuxeRVideo extends Player {
 				!configuration.getHideTranscodeEnabled() &&
 				dlna.isNoName()
 			) {
-				if (media.isVideoWithinH264LevelLimits(newInput, params.mediaRenderer) || !params.mediaRenderer.isH264Level41Limited()) {
+				if (!media.isVideoWithinH264LevelLimits(newInput, params.mediaRenderer) && params.mediaRenderer.isH264Level41Limited()) {
 					LOGGER.info("The video will not play or will show a black screen");
 				}
 			}
