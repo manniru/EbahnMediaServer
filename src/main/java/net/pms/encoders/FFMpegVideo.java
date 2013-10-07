@@ -487,7 +487,7 @@ public class FFMpegVideo extends Player {
 		List<String> cmdList = new ArrayList<>();
 		RendererConfiguration renderer = params.mediaRenderer;
 		setAudioAndSubs(fileName, media, params, configuration);
-
+		params.waitbeforestart = 2500;
 		boolean avisynth = avisynth();
 
 		cmdList.add(executable());
